@@ -24,6 +24,7 @@ import styles from "./chat.module.css";
 import {
   IconArrowUp,
   IconAttach,
+  IconCheck,
   IconFileRead,
   IconFileWrite,
   IconPdf,
@@ -41,7 +42,6 @@ function skillSlug(name: string): string {
 
 const MIN_H = 52; // --rau-composer-min-h
 const MAX_H = 240; // --rau-composer-max-h
-const COMPACT_W = 640; // §4.6 — below this the chips go icon-only
 
 /** §4.6 fixed order. */
 const TOOL_CHIPS: Array<{
@@ -129,23 +129,56 @@ export const Composer = memo(
     const [grown, setGrown] = useState(false);
     const [scrolling, setScrolling] = useState(false);
     const [dragOver, setDragOver] = useState(false);
-    const [compact, setCompact] = useState(false);
 
-    /* ---- slash-command skill menu ---- */
+    /* ---- slash-command menu (tools + skills) ---- */
     // Open while the draft is a lone "/token" (no space yet); Esc dismisses.
     const [slashIndex, setSlashIndex] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
 
     const slashMatch = /^\/(\S*)$/.exec(draft);
     const slashQuery = slashMatch ? slashMatch[1].toLowerCase() : null;
-    const slashSkills =
-      slashQuery !== null && skills
-        ? skills.filter(
-            (s) =>
-              skillSlug(s.name).startsWith(slashQuery) ||
-              s.name.toLowerCase().startsWith(slashQuery)
-          )
-        : [];
+
+    type SlashEntry =
+      | {
+          kind: "tool";
+          slug: string;
+          label: string;
+          desc: string;
+          tool: ToolName;
+          Icon: (p: IconProps) => React.JSX.Element;
+          on: boolean;
+        }
+      | { kind: "skill"; slug: string; label: string; desc: string; id: string };
+
+    const slashEntries: SlashEntry[] =
+      slashQuery === null
+        ? []
+        : [
+            ...TOOL_CHIPS.filter((t) => !unavailableTools?.[t.tool]).map(
+              ({ tool, label, Icon }): SlashEntry => ({
+                kind: "tool",
+                tool,
+                Icon,
+                slug: skillSlug(label),
+                label,
+                desc: tools.has(tool) ? "tool · on — select to turn off" : "tool",
+                on: tools.has(tool),
+              })
+            ),
+            ...(skills ?? []).map(
+              (s): SlashEntry => ({
+                kind: "skill",
+                id: s.id,
+                slug: skillSlug(s.name),
+                label: s.name,
+                desc: s.description,
+              })
+            ),
+          ].filter(
+            (e) =>
+              e.slug.startsWith(slashQuery) ||
+              e.label.toLowerCase().startsWith(slashQuery)
+          );
     const slashOpen = slashQuery !== null && !slashDismissed;
 
     useEffect(() => {
@@ -165,18 +198,6 @@ export const Composer = memo(
     }, []);
 
     useLayoutEffect(resize, [draft, resize]);
-
-    /* ---- compact chips below 640px composer width (§4.6) ---- */
-    useEffect(() => {
-      const el = shellRef.current;
-      if (!el || typeof ResizeObserver === "undefined") return;
-      const ro = new ResizeObserver((entries) => {
-        const w = entries[0]?.contentRect.width ?? 0;
-        setCompact(w < COMPACT_W);
-      });
-      ro.observe(el);
-      return () => ro.disconnect();
-    }, []);
 
     useImperativeHandle(
       ref,
@@ -201,6 +222,15 @@ export const Composer = memo(
 
     const canSend = draft.trim().length > 0 && !disabled && !isStreaming;
 
+    const toggleTool = useCallback((tool: ToolName) => {
+      setTools((prev) => {
+        const next = new Set(prev);
+        if (next.has(tool)) next.delete(tool);
+        else next.add(tool);
+        return next;
+      });
+    }, []);
+
     const pickSkill = useCallback(
       (skillId: string, remainder = "") => {
         onSelectSkill?.(skillId);
@@ -210,20 +240,50 @@ export const Composer = memo(
       [onSelectSkill]
     );
 
+    const pickEntry = useCallback(
+      (entry: SlashEntry) => {
+        if (entry.kind === "tool") {
+          toggleTool(entry.tool);
+          setDraftState("");
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        } else {
+          pickSkill(entry.id);
+        }
+      },
+      [pickSkill, toggleTool]
+    );
+
     const submit = useCallback(
       (forceTools: boolean) => {
         let text = draft.trim();
         if (!text || disabled || isStreaming) return;
 
-        // "/skill-name rest of message" invokes that skill for this turn.
+        // "/token rest of message" turns a tool on or invokes a skill.
         let skillId = activeSkillId;
+        const sendTools = new Set(tools);
         const slash = /^\/(\S+)\s*([\s\S]*)$/.exec(text);
-        if (slash && skills) {
+        if (slash) {
           const token = slash[1].toLowerCase();
-          const skill = skills.find(
+          const chip = TOOL_CHIPS.find(
+            (t) =>
+              skillSlug(t.label) === token ||
+              t.tool === token ||
+              t.tool.replace(/_/g, "-") === token
+          );
+          const skill = skills?.find(
             (s) => skillSlug(s.name) === token || s.name.toLowerCase() === token
           );
-          if (skill) {
+          if (chip && !unavailableTools?.[chip.tool]) {
+            if (!slash[2].trim()) {
+              // Bare "/web-search" just toggles the tool.
+              toggleTool(chip.tool);
+              setDraftState("");
+              return;
+            }
+            sendTools.add(chip.tool);
+            setTools(new Set(sendTools));
+            text = slash[2].trim();
+          } else if (skill) {
             if (!slash[2].trim()) {
               // Bare "/skill-name" just activates the skill.
               pickSkill(skill.id);
@@ -237,7 +297,7 @@ export const Composer = memo(
 
         onSend({
           text,
-          tools: Array.from(tools),
+          tools: Array.from(sendTools),
           skillId,
           files,
           forceTools,
@@ -255,7 +315,9 @@ export const Composer = memo(
         onSend,
         pickSkill,
         skills,
+        toggleTool,
         tools,
+        unavailableTools,
       ]
     );
 
@@ -263,22 +325,22 @@ export const Composer = memo(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         // The slash menu captures navigation keys while it's open.
         if (slashOpen) {
-          if (e.key === "ArrowDown" && slashSkills.length > 0) {
+          if (e.key === "ArrowDown" && slashEntries.length > 0) {
             e.preventDefault();
-            setSlashIndex((i) => (i + 1) % slashSkills.length);
+            setSlashIndex((i) => (i + 1) % slashEntries.length);
             return;
           }
-          if (e.key === "ArrowUp" && slashSkills.length > 0) {
+          if (e.key === "ArrowUp" && slashEntries.length > 0) {
             e.preventDefault();
             setSlashIndex(
-              (i) => (i - 1 + slashSkills.length) % slashSkills.length
+              (i) => (i - 1 + slashEntries.length) % slashEntries.length
             );
             return;
           }
-          if ((e.key === "Enter" || e.key === "Tab") && slashSkills.length > 0) {
+          if ((e.key === "Enter" || e.key === "Tab") && slashEntries.length > 0) {
             if (e.nativeEvent.isComposing) return;
             e.preventDefault();
-            pickSkill(slashSkills[slashIndex]?.id ?? slashSkills[0].id);
+            pickEntry(slashEntries[slashIndex] ?? slashEntries[0]);
             return;
           }
           if (e.key === "Escape") {
@@ -302,17 +364,8 @@ export const Composer = memo(
         e.preventDefault();
         submit(e.metaKey || e.ctrlKey);
       },
-      [isStreaming, onStop, pickSkill, slashIndex, slashOpen, slashSkills, submit]
+      [isStreaming, onStop, pickEntry, slashIndex, slashOpen, slashEntries, submit]
     );
-
-    const toggleTool = useCallback((tool: ToolName) => {
-      setTools((prev) => {
-        const next = new Set(prev);
-        if (next.has(tool)) next.delete(tool);
-        else next.add(tool);
-        return next;
-      });
-    }, []);
 
     /* ---- attachments ---- */
     const addFiles = useCallback(
@@ -352,17 +405,13 @@ export const Composer = memo(
 
           <div className={styles.popoverWrap}>
           {slashOpen ? (
-            <div className={styles.slashMenu} role="menu" aria-label="Skills">
-              {slashSkills.length === 0 ? (
-                <div className={styles.popoverEmpty}>
-                  {skills && skills.length > 0
-                    ? "No matching skill."
-                    : "No skills installed."}
-                </div>
+            <div className={styles.slashMenu} role="menu" aria-label="Commands">
+              {slashEntries.length === 0 ? (
+                <div className={styles.popoverEmpty}>No matching command.</div>
               ) : (
-                slashSkills.map((s, i) => (
+                slashEntries.map((entry, i) => (
                   <button
-                    key={s.id}
+                    key={`${entry.kind}:${entry.slug}`}
                     type="button"
                     role="menuitem"
                     className={`${styles.popoverItem} ${
@@ -372,16 +421,25 @@ export const Composer = memo(
                     // mousedown, not click — fire before the textarea blurs.
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      pickSkill(s.id);
+                      pickEntry(entry);
                     }}
                   >
                     <span className={styles.chipIcon}>
-                      <IconSkill size={14} />
+                      {entry.kind === "tool" ? (
+                        <entry.Icon size={14} />
+                      ) : (
+                        <IconSkill size={14} />
+                      )}
                     </span>
                     <span className={styles.popoverItemLabel}>
-                      /{skillSlug(s.name)}
+                      /{entry.slug}
                     </span>
-                    <span className={styles.slashDesc}>{s.description}</span>
+                    <span className={styles.slashDesc}>{entry.desc}</span>
+                    {entry.kind === "tool" && entry.on ? (
+                      <span className={styles.popoverCheck}>
+                        <IconCheck size={12} />
+                      </span>
+                    ) : null}
                   </button>
                 ))
               )}
@@ -413,8 +471,33 @@ export const Composer = memo(
               <div className={styles.dropLabel}>Drop to attach</div>
             ) : (
               <>
-                {files.length > 0 || activeSkill ? (
+                {files.length > 0 || activeSkill || tools.size > 0 ? (
                   <div className={styles.attachRow}>
+                    {TOOL_CHIPS.filter((t) => tools.has(t.tool)).map(
+                      ({ tool, label, Icon }) => (
+                        <span
+                          key={tool}
+                          className={`${styles.attachChip} ${
+                            runningTools?.includes(tool)
+                              ? styles.chipRunning
+                              : ""
+                          }`}
+                        >
+                          <span className={styles.chipIcon}>
+                            <Icon size={12} />
+                          </span>
+                          <span className={styles.attachName}>{label}</span>
+                          <button
+                            type="button"
+                            className={styles.attachRemove}
+                            aria-label={`Turn off ${label}`}
+                            onClick={() => toggleTool(tool)}
+                          >
+                            <IconX size={10} />
+                          </button>
+                        </span>
+                      )
+                    )}
                     {activeSkill ? (
                       <span className={styles.attachChip}>
                         <span className={styles.chipIcon}>
@@ -470,37 +553,7 @@ export const Composer = memo(
             <div
               className={`${styles.toolbar} ${grown ? styles.toolbarDivided : ""}`}
             >
-              <div className={styles.toolStrip} role="group" aria-label="Tools">
-                {TOOL_CHIPS.map(({ tool, label, Icon }) => {
-                  const on = tools.has(tool);
-                  const unavailable = unavailableTools?.[tool];
-                  const running = runningTools?.includes(tool) ?? false;
-                  return (
-                    <button
-                      key={tool}
-                      type="button"
-                      className={[
-                        styles.chip,
-                        on ? styles.chipOn : "",
-                        running ? styles.chipRunning : "",
-                        compact ? styles.chipIconOnly : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={() => toggleTool(tool)}
-                      disabled={Boolean(unavailable)}
-                      title={unavailable ?? label}
-                      aria-pressed={on}
-                      aria-label={label}
-                    >
-                      <span className={styles.chipIcon}>
-                        <Icon size={14} />
-                      </span>
-                      {compact ? null : label}
-                    </button>
-                  );
-                })}
-              </div>
+              <div className={styles.toolStrip} aria-hidden="true" />
 
               <div className={styles.toolbarRight}>
                 <input
@@ -565,7 +618,7 @@ export const Composer = memo(
             ) : (
               <>
                 <span>
-                  <span className={styles.hintKey}>/</span> for skills
+                  <span className={styles.hintKey}>/</span> for tools &amp; skills
                 </span>
                 <span>
                   <span className={styles.hintKey}>Enter</span> to send
