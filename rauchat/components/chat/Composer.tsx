@@ -28,6 +28,7 @@ import {
   IconFileRead,
   IconFileWrite,
   IconPdf,
+  IconRegenerate,
   IconResearch,
   IconSkill,
   IconWebSearch,
@@ -85,6 +86,9 @@ export type ComposerProps = {
   /** Tools that cannot be used, mapped to the reason shown on hover. */
   unavailableTools?: Partial<Record<ToolName, string>>;
   defaultTools?: readonly ToolName[];
+  /** "/auto" mode: every tool is loaded each turn, the agent decides usage. */
+  autoTools?: boolean;
+  onToggleAutoTools?: () => void;
   skills?: readonly Skill[];
   activeSkillId?: string | null;
   onSelectSkill?: (id: string | null) => void;
@@ -106,6 +110,8 @@ export const Composer = memo(
       runningTools,
       unavailableTools,
       defaultTools,
+      autoTools = false,
+      onToggleAutoTools,
       skills,
       activeSkillId = null,
       onSelectSkill,
@@ -139,6 +145,7 @@ export const Composer = memo(
     const slashQuery = slashMatch ? slashMatch[1].toLowerCase() : null;
 
     type SlashEntry =
+      | { kind: "mode"; slug: string; label: string; desc: string; on: boolean }
       | {
           kind: "tool";
           slug: string;
@@ -154,6 +161,15 @@ export const Composer = memo(
       slashQuery === null
         ? []
         : [
+            {
+              kind: "mode" as const,
+              slug: "auto",
+              label: "Auto tools",
+              desc: autoTools
+                ? "on — agent loads tools as needed; select to turn off"
+                : "let the agent load every tool and decide when to use them",
+              on: autoTools,
+            },
             ...TOOL_CHIPS.filter((t) => !unavailableTools?.[t.tool]).map(
               ({ tool, label, Icon }): SlashEntry => ({
                 kind: "tool",
@@ -242,15 +258,16 @@ export const Composer = memo(
 
     const pickEntry = useCallback(
       (entry: SlashEntry) => {
-        if (entry.kind === "tool") {
-          toggleTool(entry.tool);
-          setDraftState("");
-          requestAnimationFrame(() => textareaRef.current?.focus());
-        } else {
+        if (entry.kind === "skill") {
           pickSkill(entry.id);
+          return;
         }
+        if (entry.kind === "mode") onToggleAutoTools?.();
+        else toggleTool(entry.tool);
+        setDraftState("");
+        requestAnimationFrame(() => textareaRef.current?.focus());
       },
-      [pickSkill, toggleTool]
+      [onToggleAutoTools, pickSkill, toggleTool]
     );
 
     const submit = useCallback(
@@ -261,8 +278,32 @@ export const Composer = memo(
         // "/token rest of message" turns a tool on or invokes a skill.
         let skillId = activeSkillId;
         const sendTools = new Set(tools);
+        // Auto mode: the agent gets every usable tool; research stays a
+        // manual mode (it rewrites the system prompt, not just the tool set).
+        if (autoTools) {
+          for (const t of TOOL_CHIPS) {
+            if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
+              sendTools.add(t.tool);
+            }
+          }
+        }
         const slash = /^\/(\S+)\s*([\s\S]*)$/.exec(text);
-        if (slash) {
+        if (slash && slash[1].toLowerCase() === "auto") {
+          if (!slash[2].trim()) {
+            // Bare "/auto" toggles the mode.
+            onToggleAutoTools?.();
+            setDraftState("");
+            return;
+          }
+          // "/auto message" turns the mode on and applies it to this send.
+          if (!autoTools) onToggleAutoTools?.();
+          for (const t of TOOL_CHIPS) {
+            if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
+              sendTools.add(t.tool);
+            }
+          }
+          text = slash[2].trim();
+        } else if (slash) {
           const token = slash[1].toLowerCase();
           const chip = TOOL_CHIPS.find(
             (t) =>
@@ -307,12 +348,14 @@ export const Composer = memo(
       },
       [
         activeSkillId,
+        autoTools,
         disabled,
         draft,
         files,
         isStreaming,
         onSelectSkill,
         onSend,
+        onToggleAutoTools,
         pickSkill,
         skills,
         toggleTool,
@@ -427,6 +470,8 @@ export const Composer = memo(
                     <span className={styles.chipIcon}>
                       {entry.kind === "tool" ? (
                         <entry.Icon size={14} />
+                      ) : entry.kind === "mode" ? (
+                        <IconRegenerate size={14} />
                       ) : (
                         <IconSkill size={14} />
                       )}
@@ -435,7 +480,7 @@ export const Composer = memo(
                       /{entry.slug}
                     </span>
                     <span className={styles.slashDesc}>{entry.desc}</span>
-                    {entry.kind === "tool" && entry.on ? (
+                    {entry.kind !== "skill" && entry.on ? (
                       <span className={styles.popoverCheck}>
                         <IconCheck size={12} />
                       </span>
@@ -567,6 +612,28 @@ export const Composer = memo(
                   }}
                   tabIndex={-1}
                 />
+                {onToggleAutoTools ? (
+                  <button
+                    type="button"
+                    className={`${styles.autoBtn} ${
+                      autoTools ? styles.autoBtnOn : ""
+                    }`}
+                    onClick={onToggleAutoTools}
+                    aria-pressed={autoTools}
+                    aria-label="Auto tools"
+                    title={
+                      autoTools
+                        ? "Auto tools: on — agent loads tools as needed"
+                        : "Auto tools: off"
+                    }
+                  >
+                    <span className={styles.chipIcon}>
+                      <IconRegenerate size={14} />
+                    </span>
+                    auto
+                  </button>
+                ) : null}
+
                 <button
                   type="button"
                   className={`${styles.iconBtn} ${styles.iconBtnSm}`}

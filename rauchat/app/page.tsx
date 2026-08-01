@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView, defaultResolveDownloadUrl } from "@/components/chat";
 import type { ComposerSubmission } from "@/components/chat";
 import { TelemetryPanel } from "@/components/telemetry";
+import { DiagramPanel } from "@/components/diagrams";
+import { collectDiagrams } from "@/lib/diagrams";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { SettingsModal } from "@/components/modals/SettingsModal";
 import { SkillsModal } from "@/components/modals/SkillsModal";
@@ -28,10 +30,19 @@ import {
 import { useTelemetry } from "@/lib/useTelemetry";
 import { useAutoTitle, type TitleAnimationMode } from "@/lib/useAutoTitle";
 import { DEFAULT_MODEL_ID, clampThinking, getModel } from "@/lib/models";
-import type { Conversation, Message, Skill, ToolEvent, ToolName, TraitSnapshot } from "@/lib/types";
+import type {
+  Diagram,
+  Conversation,
+  Message,
+  Skill,
+  ToolEvent,
+  ToolName,
+  TraitSnapshot,
+} from "@/lib/types";
 
 const TELEMETRY_COLLAPSED_KEY = "rauchat:telemetry-collapsed";
 const MODEL_CHOICE_KEY = "rauchat:model-choice";
+const AUTO_TOOLS_KEY = "rauchat:auto-tools";
 const DEFAULT_TOOLS: ToolName[] = [];
 
 function generateId(): string {
@@ -80,6 +91,28 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
+
+  // "/auto" mode: every tool is loaded each turn and the agent decides when
+  // to use them. Persisted so it survives reloads.
+  const [autoTools, setAutoTools] = useState(false);
+  useEffect(() => {
+    try {
+      setAutoTools(window.localStorage.getItem(AUTO_TOOLS_KEY) === "1");
+    } catch {
+      // localStorage unavailable — keep the default (off).
+    }
+  }, []);
+  const toggleAutoTools = useCallback(() => {
+    setAutoTools((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(AUTO_TOOLS_KEY, next ? "1" : "0");
+      } catch {
+        // best-effort persistence
+      }
+      return next;
+    });
+  }, []);
 
   // Restore the panel's collapse state once, on mount.
   useEffect(() => {
@@ -451,6 +484,49 @@ export default function Home() {
       ? [telemetry.model, telemetry.layerInfo].filter(Boolean).join(" · ")
       : undefined;
 
+  // --- Diagrams: derived from the active conversation's tool events, so
+  // the transcript stays the single source of truth (lib/diagrams.ts).
+  const diagrams = useMemo(
+    () => collectDiagrams(store.activeConversation?.messages ?? []),
+    [store.activeConversation]
+  );
+
+  const [openDiagramId, setOpenDiagramId] = useState<string | null>(null);
+
+  // Opening a diagram folds telemetry to its rail so the three live
+  // columns fit; the user can expand it again from the rail if they want.
+  const handleOpenDiagram = useCallback((diagram: Diagram) => {
+    setOpenDiagramId(diagram.id);
+    setTelemetryCollapsed(true);
+  }, []);
+
+  // Auto-open the newest diagram of a finished turn, the way the panel
+  // appears on claude.ai — but never yank the panel away from a diagram
+  // the user opened themselves in this conversation.
+  const latestDiagramId = diagrams[0]?.id ?? null;
+  const lastAutoOpened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!latestDiagramId) return;
+    if (lastAutoOpened.current === latestDiagramId) return;
+    lastAutoOpened.current = latestDiagramId;
+    setOpenDiagramId(latestDiagramId);
+    setTelemetryCollapsed(true);
+  }, [latestDiagramId]);
+
+  // Switching conversations closes whatever was open; the new conversation's
+  // own diagrams (if any) auto-open through the effect above.
+  useEffect(() => {
+    setOpenDiagramId(null);
+    lastAutoOpened.current = null;
+  }, [store.activeId]);
+
+  const openDiagram = useMemo(
+    () => diagrams.find((a) => a.id === openDiagramId) ?? null,
+    [diagrams, openDiagramId]
+  );
+
+  const closeDiagram = useCallback(() => setOpenDiagramId(null), []);
+
   // Trait snapshots for the active conversation, derived straight from its
   // messages so there's one source of truth (no parallel history to drift).
   const traitSnapshots = useMemo<TraitSnapshot[]>(() => {
@@ -467,9 +543,18 @@ export default function Home() {
         // Sidebar manages its own collapse/peek state internally and sizes
         // itself via CSS (264px <-> 56px rail); `auto` lets this track
         // follow that intrinsic width instead of leaving dead space.
-        gridTemplateColumns: telemetryCollapsed
-          ? "auto minmax(0, 1fr) var(--rau-telemetry-w-rail)"
-          : "auto minmax(0, 1fr) var(--rau-telemetry-w)",
+        // With a diagram open the telemetry column drops to its rail so the
+        // panel gets real width without squeezing the transcript.
+        gridTemplateColumns: [
+          "auto",
+          "minmax(0, 1fr)",
+          openDiagram ? "minmax(0, clamp(380px, 42%, 760px))" : null,
+          telemetryCollapsed
+            ? "var(--rau-telemetry-w-rail)"
+            : "var(--rau-telemetry-w)",
+        ]
+          .filter(Boolean)
+          .join(" "),
         // Without an explicit row, the implicit `auto` row grows with content
         // and every column overflows 100vh — which breaks internal scrollers
         // (their height: 100% resolves against the oversized row).
@@ -512,14 +597,22 @@ export default function Home() {
         onToggleTelemetry={toggleTelemetry}
         onBranchConversation={handleBranchConversation}
         defaultTools={DEFAULT_TOOLS}
+        autoTools={autoTools}
+        onToggleAutoTools={toggleAutoTools}
         skills={skills}
         activeSkillId={activeSkillId}
         onSelectSkill={setActiveSkillId}
         onRegenerate={handleRegenerate}
         onBranch={handleBranchMessage}
         onInstallSkill={handleInstallSkill}
+        onOpenDiagram={handleOpenDiagram}
+        openDiagramId={openDiagramId}
         resolveDownloadUrl={resolveDownloadUrl}
       />
+
+      {openDiagram ? (
+        <DiagramPanel diagram={openDiagram} onClose={closeDiagram} />
+      ) : null}
 
       <TelemetryPanel
         status={telemetry.status}

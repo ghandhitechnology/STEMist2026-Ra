@@ -9,6 +9,7 @@ import { writeFile } from "node:fs/promises";
 import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import type { ToolName } from "@/lib/types";
+import { writeDiagram } from "./diagrams";
 import { createSkill } from "./skills";
 import {
   ensureWorkspaceDirs,
@@ -268,6 +269,20 @@ export async function skillMake(
 }
 
 // ---------------------------------------------------------------------------
+// diagram
+// ---------------------------------------------------------------------------
+
+export async function diagramWrite(input: {
+  id: string;
+  title?: string;
+  kind?: string;
+  language?: string;
+  content: string;
+}) {
+  return writeDiagram(input);
+}
+
+// ---------------------------------------------------------------------------
 // Anthropic tool definitions + dispatcher
 // ---------------------------------------------------------------------------
 
@@ -346,6 +361,41 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
       required: ["name", "description", "instructions"],
     },
   },
+  {
+    name: "diagram",
+    description:
+      "Create or revise a self-contained document that the user views and interacts with in a dedicated panel: an interactive React component, a standalone HTML page, an SVG graphic, a long markdown document, or a code file. Use this for anything substantial the user will read, run, reuse, or iterate on — apps, visualizations, charts, games, tools, reports, full programs. Do NOT use it for short answers, explanations, or snippets under ~15 lines; those belong in the reply. Reuse the SAME id to revise an existing diagram (each write saves a new version), and always send the COMPLETE new content — content is never merged or patched. React diagrams must import from 'react' (React 19, plus react-dom/client) and export a default component; Tailwind CSS utility classes are available in html and react diagrams. Do not reference local files, imports, or assets that do not exist — a diagram must run standalone.",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "Stable kebab-case identifier, e.g. 'sorting-visualizer'. Reuse it to revise that diagram.",
+        },
+        title: {
+          type: "string",
+          description: "Human-readable title shown in the panel header.",
+        },
+        kind: {
+          type: "string",
+          enum: ["html", "react", "svg", "markdown", "code"],
+          description:
+            "html = standalone page; react = interactive component (TSX); svg = vector graphic; markdown = prose document; code = a file shown as highlighted read-only text. Required when creating.",
+        },
+        language: {
+          type: "string",
+          description:
+            "For kind='code' only: the source language, e.g. 'python'.",
+        },
+        content: {
+          type: "string",
+          description: "The COMPLETE diagram source. Never partial or diffed.",
+        },
+      },
+      required: ["id", "title", "kind", "content"],
+    },
+  },
 ];
 
 /**
@@ -378,6 +428,8 @@ export function toolEventTitle(
       return String(input.path ?? "");
     case "skill_make":
       return String(input.name ?? "new skill");
+    case "diagram":
+      return String(input.title ?? input.id ?? "diagram");
     default:
       return "";
   }
@@ -391,7 +443,13 @@ export function toolEventTitle(
 export async function executeTool(
   tool: ToolName,
   input: Record<string, unknown>
-): Promise<{ result: unknown; detail?: string }> {
+): Promise<{
+  /** Fed back to the model as the tool result. */
+  result: unknown;
+  detail?: string;
+  /** Sent to the UI instead of `result` when the two must differ. */
+  clientResult?: unknown;
+}> {
   switch (tool) {
     case "web_search": {
       const query = String(input.query ?? "");
@@ -427,6 +485,29 @@ export async function executeTool(
       const instructions = String(input.instructions ?? "");
       const skill = await skillMake(name, description, instructions);
       return { result: skill };
+    }
+    case "diagram": {
+      const diagram = await diagramWrite({
+        id: String(input.id ?? ""),
+        title: input.title === undefined ? undefined : String(input.title),
+        kind: input.kind === undefined ? undefined : String(input.kind),
+        language:
+          input.language === undefined ? undefined : String(input.language),
+        content: String(input.content ?? ""),
+      });
+      const { versions, content, ...summary } = diagram;
+      void versions;
+      return {
+        // Echoing the body back to the model would double the diagram's
+        // cost in context — it already knows what it just wrote.
+        result: { ...summary, contentLength: content.length, saved: true },
+        // The UI does need the body, to render the panel without a round trip.
+        clientResult: { ...summary, content },
+        detail:
+          diagram.version === 1
+            ? `${diagram.kind} · created`
+            : `${diagram.kind} · v${diagram.version}`,
+      };
     }
     default:
       throw new Error(`Unknown tool: ${tool}`);

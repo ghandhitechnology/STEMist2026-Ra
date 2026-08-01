@@ -34,9 +34,24 @@ import { getTraitSnapshot } from "@/lib/server/traits";
 export const runtime = "nodejs";
 
 const MAX_TOOL_TURNS = 8;
-const MAX_TOKENS = 4096;
+// Diagrams are written in full as a single tool argument, so the ceiling has
+// to fit a complete app, not just a chat reply.
+const MAX_TOKENS = 16384;
 
-const BASE_SYSTEM_PROMPT = `You are Rauchat, a helpful, precise AI assistant with access to tools for web search, PDF creation, and reading/writing files in a sandboxed workspace. Use tools when they would materially improve the accuracy or usefulness of your answer; do not narrate tool availability, just use them. Respond in clear, well-structured markdown.`;
+const BASE_SYSTEM_PROMPT = `You are Rauchat, a helpful, precise AI assistant with access to tools for web search, PDF creation, reading/writing files in a sandboxed workspace, and publishing diagrams. Use tools when they would materially improve the accuracy or usefulness of your answer; do not narrate tool availability, just use them. Respond in clear, well-structured markdown.
+
+# Diagrams
+
+Substantial, self-contained content goes in the \`diagram\` tool rather than inline in your reply: interactive React components, standalone HTML pages, SVG graphics, long markdown documents, and complete code files. The user sees these rendered live in a side panel next to the conversation.
+
+Use a diagram when the content is something the user will run, reuse, edit, or read on its own — an app, a visualization, a chart, a game, a report, a full program. Keep short answers, explanations, and snippets under roughly 15 lines inline in your reply instead.
+
+Rules:
+- Send the COMPLETE content on every write. Content is replaced, never patched or merged.
+- To revise, call the tool again with the SAME id — each write is saved as a new version.
+- React diagrams: TSX, import from 'react' (React 19 is available, along with react-dom/client), and export a default component. Tailwind utility classes work in html and react diagrams.
+- Diagrams must run standalone: no local imports, no external assets, no files that do not exist.
+- After writing one, briefly say what you made and what the user can do with it. Do not repeat the diagram's code in your reply.`;
 
 const MessageInputSchema = z.object({
   id: z.string().optional(),
@@ -52,6 +67,7 @@ const ToolNameSchema = z.enum([
   "file_read",
   "file_write",
   "skill_make",
+  "diagram",
 ]);
 
 const ChatRequestSchema = z.object({
@@ -131,6 +147,7 @@ export async function POST(req: NextRequest) {
       "file_read",
       "file_write",
       "skill_make",
+      "diagram",
     ]);
     if (webSearch) activeToolNames.add("web_search");
     const tools = OPENAI_TOOLS.filter((t) =>
@@ -241,14 +258,17 @@ export async function POST(req: NextRequest) {
           } satisfies ToolEvent);
 
           try {
-            const { result, detail } = await executeTool(toolName, input);
+            const { result, detail, clientResult } = await executeTool(
+              toolName,
+              input
+            );
             send("tool_event", {
               id: tc.id,
               tool: toolName,
               status: "done",
               title,
               detail,
-              result,
+              result: clientResult ?? result,
             } satisfies ToolEvent);
             chatMessages.push({
               role: "tool",

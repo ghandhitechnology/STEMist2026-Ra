@@ -84,6 +84,15 @@ export const IconSkill = (p: IconProps) => (
   </Svg>
 );
 
+export const IconDiagram = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5" />
+    <path d="M1.75 5.75h12.5" />
+    <path d="M6 8.5 4.25 10.25 6 12" />
+    <path d="m10 8.5 1.75 1.75L10 12" />
+  </Svg>
+);
+
 /* ---------- chrome ---------- */
 
 export const IconChevronDown = (p: IconProps) => (
