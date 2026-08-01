@@ -14,6 +14,10 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends python3.12-venv \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt /app/requirements.txt
 RUN /usr/bin/python3 -m venv --system-site-packages "$VIRTUAL_ENV" \
     && python -m pip install --no-cache-dir -r /app/requirements.txt
