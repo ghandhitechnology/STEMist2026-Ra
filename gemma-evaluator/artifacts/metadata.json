@@ -1,0 +1,395 @@
+{
+  "schemaVersion": 1,
+  "vectorBuild": "full-original-layer-36",
+  "modelId": "google/gemma-4-12B-it",
+  "modelRevision": "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
+  "runMode": "full",
+  "activationContext": "original",
+  "sharedLayer": 36,
+  "hiddenSize": 3840,
+  "projectionRank": 8,
+  "judge": {
+    "model": "openai/gpt-5.6-luna",
+    "promptVersion": "gpt56_luna_openrouter_trait_rater_v1",
+    "passes": 1,
+    "reasoningEffort": "medium"
+  },
+  "runtime": {
+    "scoreMethod": "2 * sigmoid(calibratorCoef * rawProjection + calibratorIntercept) - 1",
+    "confidenceMethod": "absolute signed score",
+    "responsePooling": "mean over assistant response tokens"
+  },
+  "axes": [
+    {
+      "trait": "factual_hallucinatory",
+      "traitId": "factual",
+      "positiveLabel": "factual",
+      "negativeLabel": "hallucinatory",
+      "decisionThreshold": -62.792236328125,
+      "scoreScale": 11.78625774383545,
+      "calibratorCoef": 0.3808516128654051,
+      "calibratorIntercept": 25.55313195461362,
+      "unitVectorNormF16": 0.9999819368942751,
+      "metrics": {
+        "trait": "factual_hallucinatory",
+        "positive_label": "factual",
+        "negative_label": "hallucinatory",
+        "layer": 36,
+        "test_auc": 0.9792663477,
+        "test_auc_ci95": [
+          0.9417259317,
+          1.0
+        ],
+        "test_accuracy": 0.9240506329,
+        "test_balanced_accuracy": 0.9334130781,
+        "test_spearman": 0.7287271803,
+        "confusion_matrix": [
+          [
+            21,
+            1
+          ],
+          [
+            5,
+            52
+          ]
+        ],
+        "n_train": 314,
+        "n_test": 79,
+        "n_train_positive": 236,
+        "n_train_negative": 78,
+        "n_test_positive": 57,
+        "n_test_negative": 22
+      }
+    },
+    {
+      "trait": "serious_funny",
+      "traitId": "serious",
+      "positiveLabel": "serious",
+      "negativeLabel": "funny",
+      "decisionThreshold": 38.96949863433838,
+      "scoreScale": 9.705045700073242,
+      "calibratorCoef": 0.9858958792316094,
+      "calibratorIntercept": -37.806669490056144,
+      "unitVectorNormF16": 1.0000614399002767,
+      "metrics": {
+        "trait": "serious_funny",
+        "positive_label": "serious",
+        "negative_label": "funny",
+        "layer": 36,
+        "test_auc": 1.0,
+        "test_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "test_accuracy": 1.0,
+        "test_balanced_accuracy": 1.0,
+        "test_spearman": 0.8629427631,
+        "confusion_matrix": [
+          [
+            40,
+            0
+          ],
+          [
+            0,
+            40
+          ]
+        ],
+        "n_train": 320,
+        "n_test": 80,
+        "n_train_positive": 160,
+        "n_train_negative": 160,
+        "n_test_positive": 40,
+        "n_test_negative": 40
+      }
+    },
+    {
+      "trait": "casual_formal",
+      "traitId": "casual",
+      "positiveLabel": "casual",
+      "negativeLabel": "formal",
+      "decisionThreshold": -46.99712371826172,
+      "scoreScale": 7.3515543937683105,
+      "calibratorCoef": 0.9873622243995814,
+      "calibratorIntercept": 44.85370579930302,
+      "unitVectorNormF16": 1.0000294664310083,
+      "metrics": {
+        "trait": "casual_formal",
+        "positive_label": "casual",
+        "negative_label": "formal",
+        "layer": 36,
+        "test_auc": 0.9949127907,
+        "test_auc_ci95": [
+          0.9816993464,
+          1.0
+        ],
+        "test_accuracy": 0.96,
+        "test_balanced_accuracy": 0.9651162791,
+        "test_spearman": 0.8887079323,
+        "confusion_matrix": [
+          [
+            40,
+            3
+          ],
+          [
+            0,
+            32
+          ]
+        ],
+        "n_train": 294,
+        "n_test": 75,
+        "n_train_positive": 121,
+        "n_train_negative": 173,
+        "n_test_positive": 32,
+        "n_test_negative": 43
+      }
+    },
+    {
+      "trait": "creative_empirical",
+      "traitId": "creative",
+      "positiveLabel": "creative",
+      "negativeLabel": "empirical",
+      "decisionThreshold": 12.950736999511719,
+      "scoreScale": 6.894939422607422,
+      "calibratorCoef": 1.6660953410204353,
+      "calibratorIntercept": -20.336852800850775,
+      "unitVectorNormF16": 1.0000074561776318,
+      "metrics": {
+        "trait": "creative_empirical",
+        "positive_label": "creative",
+        "negative_label": "empirical",
+        "layer": 36,
+        "test_auc": 0.9878787879,
+        "test_auc_ci95": [
+          0.9642457181,
+          1.0
+        ],
+        "test_accuracy": 0.9315068493,
+        "test_balanced_accuracy": 0.9268939394,
+        "test_spearman": 0.8969389438,
+        "confusion_matrix": [
+          [
+            29,
+            4
+          ],
+          [
+            1,
+            39
+          ]
+        ],
+        "n_train": 264,
+        "n_test": 73,
+        "n_train_positive": 158,
+        "n_train_negative": 106,
+        "n_test_positive": 40,
+        "n_test_negative": 33
+      }
+    },
+    {
+      "trait": "honest_sycophantic",
+      "traitId": "honest",
+      "positiveLabel": "honest",
+      "negativeLabel": "sycophantic",
+      "decisionThreshold": -61.86116600036621,
+      "scoreScale": 12.665021896362305,
+      "calibratorCoef": 0.34289744978552755,
+      "calibratorIntercept": 20.65742680760742,
+      "unitVectorNormF16": 0.9999577899724181,
+      "metrics": {
+        "trait": "honest_sycophantic",
+        "positive_label": "honest",
+        "negative_label": "sycophantic",
+        "layer": 36,
+        "test_auc": 0.9954988747,
+        "test_auc_ci95": [
+          0.9874511573,
+          1.0
+        ],
+        "test_accuracy": 0.9864864865,
+        "test_balanced_accuracy": 0.9838709677,
+        "test_spearman": 0.8538364765,
+        "confusion_matrix": [
+          [
+            30,
+            1
+          ],
+          [
+            0,
+            43
+          ]
+        ],
+        "n_train": 305,
+        "n_test": 74,
+        "n_train_positive": 167,
+        "n_train_negative": 138,
+        "n_test_positive": 43,
+        "n_test_negative": 31
+      }
+    },
+    {
+      "trait": "confident_unsure",
+      "traitId": "confident",
+      "positiveLabel": "confident",
+      "negativeLabel": "unsure",
+      "decisionThreshold": 37.71305847167969,
+      "scoreScale": 7.144122123718262,
+      "calibratorCoef": 1.6764593898686069,
+      "calibratorIntercept": -65.33331298461187,
+      "unitVectorNormF16": 1.0000276377128672,
+      "metrics": {
+        "trait": "confident_unsure",
+        "positive_label": "confident",
+        "negative_label": "unsure",
+        "layer": 36,
+        "test_auc": 1.0,
+        "test_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "test_accuracy": 1.0,
+        "test_balanced_accuracy": 1.0,
+        "test_spearman": 0.8639395409,
+        "confusion_matrix": [
+          [
+            40,
+            0
+          ],
+          [
+            0,
+            40
+          ]
+        ],
+        "n_train": 313,
+        "n_test": 80,
+        "n_train_positive": 156,
+        "n_train_negative": 157,
+        "n_test_positive": 40,
+        "n_test_negative": 40
+      }
+    },
+    {
+      "trait": "empathetic_unempathetic",
+      "traitId": "empathetic",
+      "positiveLabel": "empathetic",
+      "negativeLabel": "unempathetic",
+      "decisionThreshold": -43.6528263092041,
+      "scoreScale": 10.935633659362793,
+      "calibratorCoef": 1.0071825231681555,
+      "calibratorIntercept": 44.45935375753519,
+      "unitVectorNormF16": 1.0000086696388497,
+      "metrics": {
+        "trait": "empathetic_unempathetic",
+        "positive_label": "empathetic",
+        "negative_label": "unempathetic",
+        "layer": 36,
+        "test_auc": 1.0,
+        "test_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "test_accuracy": 1.0,
+        "test_balanced_accuracy": 1.0,
+        "test_spearman": 0.845309355,
+        "confusion_matrix": [
+          [
+            36,
+            0
+          ],
+          [
+            0,
+            40
+          ]
+        ],
+        "n_train": 303,
+        "n_test": 76,
+        "n_train_positive": 160,
+        "n_train_negative": 143,
+        "n_test_positive": 40,
+        "n_test_negative": 36
+      }
+    },
+    {
+      "trait": "calm_anxious",
+      "traitId": "calm",
+      "positiveLabel": "calm",
+      "negativeLabel": "anxious",
+      "decisionThreshold": 60.547719955444336,
+      "scoreScale": 10.86964225769043,
+      "calibratorCoef": 0.9125269991356267,
+      "calibratorIntercept": -55.49303057407294,
+      "unitVectorNormF16": 1.0000447178016494,
+      "metrics": {
+        "trait": "calm_anxious",
+        "positive_label": "calm",
+        "negative_label": "anxious",
+        "layer": 36,
+        "test_auc": 1.0,
+        "test_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "test_accuracy": 1.0,
+        "test_balanced_accuracy": 1.0,
+        "test_spearman": 0.8294934889,
+        "confusion_matrix": [
+          [
+            39,
+            0
+          ],
+          [
+            0,
+            40
+          ]
+        ],
+        "n_train": 317,
+        "n_test": 79,
+        "n_train_positive": 160,
+        "n_train_negative": 157,
+        "n_test_positive": 40,
+        "n_test_negative": 39
+      }
+    }
+  ],
+  "warnings": [
+    "Vectors were fitted from original contrastive prompt contexts; treat cross-model projections as provisional until a neutral-context bundle passes the same held-out gates.",
+    "Judge stability used fewer than the notebook's recommended three final passes."
+  ],
+  "sourceFiles": [
+    {
+      "name": "full__original__shared_layer_36__factual_hallucinatory.pt",
+      "sha256": "91ecb671dda8c49d31600650cfe7b2d5ef220dc20100b2dcd344c4195731958b"
+    },
+    {
+      "name": "full__original__shared_layer_36__serious_funny.pt",
+      "sha256": "a53f67c50a42f52e3bae5399d84d5fcc51ace0d61e75e6c51bc0d7466dc97d4c"
+    },
+    {
+      "name": "full__original__shared_layer_36__casual_formal.pt",
+      "sha256": "91afe2f51dc2ba33b61314a954a5001fbe8a2b3c7a768e9675d0ee98c552e618"
+    },
+    {
+      "name": "full__original__shared_layer_36__creative_empirical.pt",
+      "sha256": "f6e258cc4f23897f06ab464a4fb47edf18833ee47a09fcabb23a4c658eef6eb9"
+    },
+    {
+      "name": "full__original__shared_layer_36__honest_sycophantic.pt",
+      "sha256": "5aba29077acb47332beb8c99ee756186d04f68e4bbfe0827c399b005efd8bc89"
+    },
+    {
+      "name": "full__original__shared_layer_36__confident_unsure.pt",
+      "sha256": "7a4bc384952569a7464d486da3577299411420089489ed8999abfa12ea3b9473"
+    },
+    {
+      "name": "full__original__shared_layer_36__empathetic_unempathetic.pt",
+      "sha256": "11190a433296c5e9e17fe91dd14dac790582c5543c195c1bea67beb0adf26dc7"
+    },
+    {
+      "name": "full__original__shared_layer_36__calm_anxious.pt",
+      "sha256": "b7e589f9504044378568fc6ada2f09947536d56852d07b2b8ca499d857792d7f"
+    }
+  ],
+  "tensorFile": {
+    "name": "vectors.safetensors",
+    "sha256": "71e6b35afff83223a3d93a323d77a9a9b820d6172277507a064f5dbfbe63f5b5"
+  },
+  "convertedAtUtc": "2026-08-01T14:27:56.639160+00:00"
+}

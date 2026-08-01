@@ -26,3 +26,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Raw Gemma/Colab exports (large, pickle-based research artifacts)
+gemma-results/

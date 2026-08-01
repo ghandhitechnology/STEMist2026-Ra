@@ -15,7 +15,7 @@ export const runtime = "nodejs";
  * Flattens lib/server/traits.ts's TraitStatusResponse (whose `layerInfo` is
  * a structured object, per the Gemma remote contract) into the string-typed
  * payload lib/useTelemetry.ts and <TelemetryPanel/> expect: `layerInfo` as
- * "12-24 · rank 8", `vectorSet` as the build tag, `detail` as the error copy.
+ * "36 · rank 8", `vectorSet` as the build tag, `detail` as the error copy.
  */
 export async function GET() {
   if (!(await getUserId())) return unauthorized();

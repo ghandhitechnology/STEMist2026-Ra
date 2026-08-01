@@ -41,6 +41,7 @@ import { readMemory } from "@/lib/server/memory";
 export const runtime = "nodejs";
 
 const MAX_TOOL_TURNS = 8;
+const MAX_TRAIT_CONTEXT_CHARS = 16000;
 // Diagrams are written in full as a single tool argument, so the ceiling has
 // to fit a complete app, not just a chat reply.
 const MAX_TOKENS = 16384;
@@ -92,6 +93,23 @@ type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
 /** In-flight accumulator for one streamed tool call. */
 type PendingToolCall = { id: string; name: string; arguments: string };
+
+function buildTraitEvaluationPrompt(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  evidence: string[]
+): string {
+  const latestUser = [...messages]
+    .reverse()
+    .find((message) => message.role === "user")?.content.trim();
+  const userSection = latestUser || "Evaluate the assistant response.";
+  if (!evidence.length) return userSection.slice(-MAX_TRAIT_CONTEXT_CHARS);
+  const combined = [
+    `User request:\n${userSection}`,
+    `Tool/reference context used by the assistant:\n${evidence.join("\n\n")}`,
+  ].join("\n\n");
+  // Keep the most recent evidence when tool output exceeds the evaluator window.
+  return combined.slice(-MAX_TRAIT_CONTEXT_CHARS);
+}
 
 function buildSkillSection(skills: Skill[]): string {
   if (!skills.length) return "";
@@ -226,6 +244,7 @@ export async function POST(req: NextRequest) {
     ];
 
     let finalAssistantText = "";
+    const traitEvidence: string[] = [];
 
     try {
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
@@ -342,6 +361,9 @@ export async function POST(req: NextRequest) {
               tool_call_id: tc.id,
               content: JSON.stringify(result),
             });
+            traitEvidence.push(
+              `[${toolName}]\n${JSON.stringify(result).slice(0, 6000)}`
+            );
           } catch (err) {
             const errMessage =
               err instanceof Error ? err.message : "Tool execution failed.";
@@ -369,7 +391,13 @@ export async function POST(req: NextRequest) {
 
     // --- Trait telemetry for this exchange; Gemma failures never surface.
     try {
-      const snapshot = await getTraitSnapshot(finalAssistantText, messages.length);
+      const snapshot = await getTraitSnapshot(
+        {
+          prompt: buildTraitEvaluationPrompt(messages, traitEvidence),
+          response: finalAssistantText,
+        },
+        messages.length
+      );
       if (snapshot) {
         send("trait_snapshot", snapshot);
       }

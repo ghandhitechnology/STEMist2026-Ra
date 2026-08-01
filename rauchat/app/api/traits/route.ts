@@ -1,5 +1,5 @@
 /**
- * app/api/traits/route.ts — POST { text, turnIndex? } -> TraitSnapshot
+ * app/api/traits/route.ts — POST { prompt, response, turnIndex? } -> TraitSnapshot
  *
  * Standalone trait-projection endpoint (ad hoc telemetry, not the internal
  * per-turn call app/api/chat/route.ts makes directly against
@@ -16,7 +16,8 @@ import { getUserId, unauthorized } from "@/lib/server/auth";
 export const runtime = "nodejs";
 
 const TraitsRequestSchema = z.object({
-  text: z.string().min(1, "text must not be empty"),
+  prompt: z.string().min(1, "prompt must not be empty"),
+  response: z.string().min(1, "response must not be empty"),
   turnIndex: z.number().int().optional().default(0),
 });
 
@@ -46,7 +47,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const snapshot = await getTraitSnapshot(
-      parsed.data.text,
+      {
+        prompt: parsed.data.prompt,
+        response: parsed.data.response,
+      },
       parsed.data.turnIndex
     );
     if (!snapshot) {
