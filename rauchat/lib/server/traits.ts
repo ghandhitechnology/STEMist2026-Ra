@@ -2,7 +2,7 @@
  * lib/server/traits.ts — the Gemma 4 12B trait-projection evaluator client.
  *
  * ============================================================================
- * GEMMA 4 12B REMOTE CONTRACT (implement this on the Colab/Gemma side)
+ * GEMMA 4 12B REMOTE CONTRACT (implemented by ../gemma-evaluator)
  * ============================================================================
  *
  * Rauchat expects `GEMMA_ENDPOINT_URL` to serve two HTTP endpoints. Both
@@ -16,9 +16,8 @@
  *      "status": "ok",
  *      "model": "gemma-4-12b",
  *      "layerInfo"?: {
- *        "layerRange": string,       // e.g. "12-24"
+ *        "layerRange": string,       // e.g. "36"
  *        "projectionRank": number,   // e.g. 8
- *        "steeringAlpha": number,    // e.g. 4.0
  *        "vectorBuild": string       // e.g. "2026-07-30-persona-v3"
  *      }
  *    }
@@ -29,7 +28,7 @@
  *
  * 2. POST {GEMMA_ENDPOINT_URL}/project
  *
- *    Request JSON: { "text": string }
+ *    Request JSON: { "prompt": string, "response": string }
  *
  *    Response 200 JSON:
  *    {
@@ -61,12 +60,11 @@ import type {
 import { TRAIT_AXES } from "@/lib/types";
 
 const HEALTH_TIMEOUT_MS = 4000;
-const PROJECT_TIMEOUT_MS = 12000;
+const PROJECT_TIMEOUT_MS = Number(process.env.GEMMA_PROJECT_TIMEOUT_MS) || 60000;
 
 export type LayerInfo = {
   layerRange?: string;
   projectionRank?: number;
-  steeringAlpha?: number;
   vectorBuild?: string;
 };
 
@@ -76,6 +74,13 @@ export type TraitStatusResponse = {
   layerInfo?: LayerInfo;
   /** Human-readable detail for the 'error' status (DESIGN.md §6.1 detail line). */
   detail?: string;
+};
+
+export type TraitProjectionInput = {
+  /** Latest user request plus any reference/tool evidence used for the answer. */
+  prompt: string;
+  /** Completed assistant response whose response-token activations are projected. */
+  response: string;
 };
 
 function endpointHeaders(extra?: Record<string, string>): Record<string, string> {
@@ -107,16 +112,32 @@ export async function getTraitStatus(): Promise<TraitStatusResponse> {
       headers: endpointHeaders(),
       signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
     });
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: unknown;
+      layerInfo?: LayerInfo;
+      detail?: unknown;
+    };
     if (!res.ok) {
+      if (
+        res.status === 503 &&
+        (data.status === "loading" || data.status === "connecting")
+      ) {
+        return {
+          status: "connecting",
+          model: "gemma-4-12b",
+          layerInfo: data.layerInfo,
+          detail: typeof data.detail === "string" ? data.detail : "loading model",
+        };
+      }
       return {
         status: "error",
         model: "gemma-4-12b",
-        detail: `remote refused (${res.status})`,
+        detail:
+          typeof data.detail === "string"
+            ? data.detail
+            : `remote refused (${res.status})`,
       };
     }
-    const data = (await res.json().catch(() => ({}))) as {
-      layerInfo?: LayerInfo;
-    };
     return {
       status: "live",
       model: "gemma-4-12b",
@@ -139,7 +160,7 @@ export async function getTraitStatus(): Promise<TraitStatusResponse> {
  * network error so callers can distinguish "not configured" from "errored".
  */
 export async function getTraitSnapshot(
-  text: string,
+  input: TraitProjectionInput,
   turnIndex: number
 ): Promise<TraitSnapshot | null> {
   const url = baseUrl();
@@ -148,7 +169,7 @@ export async function getTraitSnapshot(
   const res = await fetch(`${url}/project`, {
     method: "POST",
     headers: endpointHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(input),
     signal: AbortSignal.timeout(PROJECT_TIMEOUT_MS),
   });
 
@@ -170,6 +191,7 @@ export async function getTraitSnapshot(
 function parseReadings(raw: unknown): TraitReading[] {
   if (!Array.isArray(raw)) return [];
   const validIds = new Set<string>(Object.keys(TRAIT_AXES));
+  const seenIds = new Set<string>();
   const out: TraitReading[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
@@ -178,7 +200,9 @@ function parseReadings(raw: unknown): TraitReading[] {
     const score = Number(record.score);
     const confidence = Number(record.confidence);
     if (typeof traitId !== "string" || !validIds.has(traitId)) continue;
+    if (seenIds.has(traitId)) continue;
     if (!Number.isFinite(score) || !Number.isFinite(confidence)) continue;
+    seenIds.add(traitId);
     out.push({
       traitId: traitId as TraitId,
       score: Math.max(-1, Math.min(1, score)),

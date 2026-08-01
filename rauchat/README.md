@@ -53,8 +53,8 @@ Skills library expose the same sandbox and skill set through the UI.
                 │                                │
                 ▼                                ▼
         OpenRouter API                    Gemma 4 12B evaluator
- (all six chat models + Luna titling)   (remote, e.g. a Colab tunnel —
-                                          optional, see contract below)
+ (all six chat models + Luna titling)   (remote GPU service in
+                                          ../gemma-evaluator)
 ```
 
 ## Models & thinking levels
@@ -83,6 +83,7 @@ boot (the app degrades gracefully when a variable is unset).
 | `RAUCHAT_PUBLIC_URL` | OpenRouter attribution header | `http://localhost:3000` |
 | `GEMMA_ENDPOINT_URL` | Model Telemetry panel | unset → panel stays "disconnected" |
 | `GEMMA_API_KEY` | bearer auth to the Gemma endpoint | unset → no `Authorization` header |
+| `GEMMA_PROJECT_TIMEOUT_MS` | completed-response projection timeout | `60000` |
 | `TAVILY_API_KEY` | higher-quality `web_search` | unset → falls back to scraping DuckDuckGo HTML |
 | `RAUCHAT_WORKSPACE` | sandbox root for files/PDFs/skills | `./workspace` |
 
@@ -98,17 +99,26 @@ includes `Authorization: Bearer <GEMMA_API_KEY>` when that variable is set.
   "status": "ok",
   "model": "gemma-4-12b",
   "layerInfo": {
-    "layerRange": "12-24",
+    "layerRange": "36",
     "projectionRank": 8,
-    "steeringAlpha": 4.0,
-    "vectorBuild": "2026-07-30-persona-v3"
+    "vectorBuild": "full-original-layer-36"
   }
 }
 ```
 `layerInfo` is optional; when present it's surfaced in the panel's
 "Substrate" section.
 
-**`POST {GEMMA_ENDPOINT_URL}/project`** — body `{ "text": string }`
+**`POST {GEMMA_ENDPOINT_URL}/project`** — body:
+
+```json
+{
+  "prompt": "latest user request and relevant tool/reference evidence",
+  "response": "completed assistant response"
+}
+```
+
+Response:
+
 ```json
 {
   "readings": [
@@ -120,8 +130,9 @@ includes `Authorization: Bearer <GEMMA_API_KEY>` when that variable is set.
 `score` is signed in `-1..1` (positive leans toward the axis's first-named
 pole); `confidence` is `0..1`.
 
-This is what your Colab/Gemma notebook needs to expose (e.g. via `ngrok` or
-a Colab tunnel) and point `GEMMA_ENDPOINT_URL` at.
+The evaluator implementation, safe vector bundle, container, and artifact
+conversion script live in `../gemma-evaluator`. See
+`../GEMMA_RUNPOD_DEPLOYMENT.md` for the persistent-GPU deployment procedure.
 
 ## Running it
 

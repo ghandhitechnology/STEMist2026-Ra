@@ -1,0 +1,8 @@
+accelerate>=1.10,<2
+fastapi>=0.116,<1
+huggingface_hub>=0.35,<2
+hf_xet>=1.1,<2
+pydantic>=2.11,<3
+safetensors>=0.6,<1
+transformers>=5.10.1,<5.12
+uvicorn[standard]>=0.35,<1
