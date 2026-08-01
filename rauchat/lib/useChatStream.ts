@@ -382,12 +382,16 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
           /* the stream is already closed */
         }
 
+        // A newer send() has taken over: this is a stale continuation and
+        // must not touch the live turn's controller, buffer, or flags.
+        if (abortRef.current !== controller) return null;
+        abortRef.current = null;
+
         cancelFlush();
         const final = { ...bufferRef.current };
         setStreamingMessage(final);
         setStreamingThinking(thinkingRef.current);
         setIsStreaming(false);
-        abortRef.current = null;
 
         if (status.error) {
           setError(status.error);
@@ -398,7 +402,12 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
         handlers.current.onDone?.(final);
         return final;
       } catch (err) {
+        // Superseded by a newer send(): that turn owns the state now, so this
+        // one unwinds silently. (This is the common case when the user starts
+        // a turn in another conversation.)
+        if (abortRef.current !== controller) return null;
         abortRef.current = null;
+
         if (err instanceof DOMException && err.name === "AbortError") {
           // User-initiated stop: keep whatever streamed, no error surface.
           cancelFlush();

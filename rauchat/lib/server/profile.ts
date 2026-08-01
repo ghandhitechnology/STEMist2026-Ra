@@ -9,8 +9,10 @@
  * deletion.
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { profileFile, profilesDir } from "./paths";
+
+export { profilesDir };
 
 export type Profile = {
   firstName: string;
@@ -21,35 +23,13 @@ export type Profile = {
   updatedAt: number;
 };
 
-const BASE_ROOT = path.resolve(
-  process.cwd(),
-  process.env.RAUCHAT_WORKSPACE || "./workspace"
-);
-
-/** <base>/profiles, matching the sandboxed workspace's sanitization rules. */
-export function profilesDir(): string {
-  return path.join(BASE_ROOT, "profiles");
-}
-
-function sanitizeUserId(userId: string): string {
-  const safe = String(userId ?? "").replace(/[^a-zA-Z0-9_-]/g, "");
-  if (!safe) {
-    throw new Error("Invalid user id for profile access.");
-  }
-  return safe;
-}
-
-function profileFilePath(userId: string): string {
-  return path.join(profilesDir(), `${sanitizeUserId(userId)}.json`);
-}
-
 async function ensureProfilesDir(): Promise<void> {
   await mkdir(profilesDir(), { recursive: true });
 }
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   try {
-    const raw = await readFile(profileFilePath(userId), "utf8");
+    const raw = await readFile(profileFile(userId), "utf8");
     const parsed = JSON.parse(raw) as Partial<Profile>;
     if (
       typeof parsed.firstName !== "string" ||
@@ -93,14 +73,13 @@ export async function saveProfile(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
-  await writeFile(profileFilePath(userId), JSON.stringify(profile, null, 2), "utf8");
+  await writeFile(profileFile(userId), JSON.stringify(profile, null, 2), "utf8");
   return profile;
 }
 
 export async function deleteProfile(userId: string): Promise<void> {
   try {
-    const { unlink } = await import("node:fs/promises");
-    await unlink(profileFilePath(userId));
+    await unlink(profileFile(userId));
   } catch {
     // Already gone — deleting a nonexistent profile is not an error.
   }

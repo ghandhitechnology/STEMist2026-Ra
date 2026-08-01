@@ -103,14 +103,19 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
 
-  const refreshAccount = useCallback(async () => {
+  /**
+   * Loads the signed-in account. Retries on transient failure: conversations
+   * are keyed by user id, so an app left without an account never persists
+   * anything the user types — silence is not an acceptable failure here.
+   */
+  const refreshAccount = useCallback(async (attempt = 0): Promise<void> => {
     try {
       const res = await fetch("/api/profile");
       if (res.status === 401) {
         window.location.href = "/sign-in";
         return;
       }
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`profile ${res.status}`);
       const data = (await res.json()) as {
         profile: AccountProfile | null;
         user: AccountUser;
@@ -121,8 +126,11 @@ export default function Home() {
       }
       setAccount({ profile: data.profile, user: data.user });
     } catch {
-      // Offline or transient failure — the footer chip stays in its
-      // placeholder state rather than bouncing the user out of the app.
+      // Offline or a transient 5xx: back off and try again rather than
+      // sitting in a permanently accountless state.
+      if (attempt >= 5) return;
+      const delay = Math.min(1000 * 2 ** attempt, 15000);
+      window.setTimeout(() => void refreshAccount(attempt + 1), delay);
     }
   }, []);
 
@@ -379,6 +387,25 @@ export default function Home() {
     wasStreamingRef.current = chat.isStreaming;
   }, [chat.isStreaming, chat.streamingMessage, appendAssistantTurn]);
 
+  /**
+   * Commits the in-flight turn's partial reply to the conversation that owns
+   * it, when a turn is about to start somewhere else. Without this the
+   * abort inside useChatStream.send() discards it and the other conversation
+   * is left with a user message and no answer.
+   */
+  const salvageInterruptedTurn = useCallback(
+    (nextConversationId: string) => {
+      const owner = pendingConversationIdRef.current;
+      if (!owner || owner === nextConversationId) return;
+      const streamed = chat.streamingMessage;
+      if (streamed && (streamed.content.trim() || streamed.toolEvents.length)) {
+        appendAssistantTurn(owner, streamed);
+      }
+      pendingConversationIdRef.current = null;
+    },
+    [chat.streamingMessage, appendAssistantTurn]
+  );
+
   const handleSend = useCallback(
     (submission: ComposerSubmission) => {
       const text = submission.text.trim();
@@ -404,6 +431,11 @@ export default function Home() {
       };
       store.appendMessage(conversationId, userMessage);
 
+      // Only one turn streams at a time. Starting one here aborts a turn
+      // running in another conversation, so bank whatever it produced into
+      // that conversation first — losing it silently is not acceptable.
+      salvageInterruptedTurn(conversationId);
+
       const model = getModel(conversation.modelId ?? modelChoice.modelId);
       pendingConversationIdRef.current = conversationId;
       setStreamOwnerId(conversationId);
@@ -420,7 +452,7 @@ export default function Home() {
         ),
       });
     },
-    [chat, store, modelChoice]
+    [chat, store, modelChoice, salvageInterruptedTurn]
   );
 
   const sendParamsFor = useCallback(
@@ -440,6 +472,7 @@ export default function Home() {
   const handleRetry = useCallback(() => {
     const conversation = store.activeConversation;
     if (!conversation || conversation.messages.length === 0) return;
+    salvageInterruptedTurn(conversation.id);
     pendingConversationIdRef.current = conversation.id;
     setStreamOwnerId(conversation.id);
     void chat.send({
@@ -447,7 +480,7 @@ export default function Home() {
       conversationId: conversation.id,
       ...sendParamsFor(conversation),
     });
-  }, [chat, store, sendParamsFor]);
+  }, [chat, store, sendParamsFor, salvageInterruptedTurn]);
 
   const handleRegenerate = useCallback(
     (message: Message) => {
@@ -457,6 +490,7 @@ export default function Home() {
       if (idx === -1) return;
       const history = conversation.messages.slice(0, idx);
       store.replaceMessages(conversation.id, history);
+      salvageInterruptedTurn(conversation.id);
       pendingConversationIdRef.current = conversation.id;
       setStreamOwnerId(conversation.id);
       void chat.send({
@@ -465,7 +499,7 @@ export default function Home() {
         ...sendParamsFor(conversation),
       });
     },
-    [chat, store, sendParamsFor]
+    [chat, store, sendParamsFor, salvageInterruptedTurn]
   );
 
   const branchFrom = useCallback(

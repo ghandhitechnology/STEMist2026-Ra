@@ -14,6 +14,7 @@ import {
   updateSkill,
 } from "@/lib/server/skills";
 import { getUserId, unauthorized } from "@/lib/server/auth";
+import { crossSiteRejection } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,9 @@ const CreateSkillSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const crossSite = crossSiteRejection(req);
+  if (crossSite) return crossSite;
+
   const userId = await getUserId();
   if (!userId) return unauthorized();
   let body: unknown;
@@ -62,6 +66,9 @@ const UpdateSkillSchema = z
   .refine((v) => Object.keys(v).length > 0, { message: "Empty patch." });
 
 export async function PATCH(req: NextRequest) {
+  const crossSite = crossSiteRejection(req);
+  if (crossSite) return crossSite;
+
   const userId = await getUserId();
   if (!userId) return unauthorized();
   const id = req.nextUrl.searchParams.get("id");

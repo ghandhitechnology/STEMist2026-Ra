@@ -11,22 +11,13 @@
  */
 
 import { rm } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { getWorkOS } from "@workos-inc/authkit-nextjs";
 import { getUserId, unauthorized } from "@/lib/server/auth";
-import { workspaceRootFor } from "@/lib/server/workspace";
-import { deleteProfile, profilesDir } from "@/lib/server/profile";
+import { memoryFile, userWorkspaceRoot } from "@/lib/server/paths";
+import { deleteProfile } from "@/lib/server/profile";
 
 export const runtime = "nodejs";
-
-function sanitizeUserId(userId: string): string {
-  const safe = String(userId ?? "").replace(/[^a-zA-Z0-9_-]/g, "");
-  if (!safe) {
-    throw new Error("Invalid user id for account deletion.");
-  }
-  return safe;
-}
 
 export async function DELETE() {
   const userId = await getUserId();
@@ -40,11 +31,9 @@ export async function DELETE() {
   //    metadata. The identity is already gone, so failures here leave only
   //    orphaned files — never a live account with missing data.
   try {
-    await rm(workspaceRootFor(userId), { recursive: true, force: true });
+    await rm(userWorkspaceRoot(userId), { recursive: true, force: true });
     await deleteProfile(userId);
-    await rm(path.join(profilesDir(), `${sanitizeUserId(userId)}.memory.md`), {
-      force: true,
-    });
+    await rm(memoryFile(userId), { force: true });
   } catch {
     // Best effort: the account is deleted either way.
   }

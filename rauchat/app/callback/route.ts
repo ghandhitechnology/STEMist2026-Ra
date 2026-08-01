@@ -10,6 +10,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getWorkOS, saveSession } from "@workos-inc/authkit-nextjs";
+import { redirectTo } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 
@@ -23,10 +24,10 @@ function clearFlowCookies(response: NextResponse): NextResponse {
   return response;
 }
 
-function failed(req: NextRequest, reason: string): NextResponse {
-  const url = new URL("/sign-in", req.nextUrl.origin);
-  url.searchParams.set("error", reason);
-  return clearFlowCookies(NextResponse.redirect(url, 302));
+function failed(_req: NextRequest, reason: string): NextResponse {
+  return clearFlowCookies(
+    redirectTo(`/sign-in?error=${encodeURIComponent(reason)}`)
+  );
 }
 
 export async function GET(req: NextRequest) {
@@ -49,9 +50,7 @@ export async function GET(req: NextRequest) {
       code,
       codeVerifier,
     });
-    const response = clearFlowCookies(
-      NextResponse.redirect(new URL("/", req.nextUrl.origin), 302)
-    );
+    const response = clearFlowCookies(redirectTo("/"));
     // saveSession writes the sealed `wos-session` cookie through next/headers;
     // Next merges that mutation into this response.
     await saveSession(authResponse, req);

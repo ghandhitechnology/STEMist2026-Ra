@@ -11,26 +11,13 @@
 
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { userWorkspaceRoot, WorkspacePathError } from "./paths";
 
-export class WorkspacePathError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "WorkspacePathError";
-  }
-}
-
-const BASE_ROOT = path.resolve(
-  process.cwd(),
-  process.env.RAUCHAT_WORKSPACE || "./workspace"
-);
+export { WorkspacePathError };
 
 /** Per-user sandbox root: <base>/users/<sanitized user id>. */
 export function workspaceRootFor(userId: string): string {
-  const safe = String(userId ?? "").replace(/[^a-zA-Z0-9_-]/g, "");
-  if (!safe) {
-    throw new WorkspacePathError("Invalid user id for workspace access.");
-  }
-  return path.join(BASE_ROOT, "users", safe);
+  return userWorkspaceRoot(userId);
 }
 
 export function exportsDirFor(userId: string): string {

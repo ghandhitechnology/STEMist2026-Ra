@@ -17,6 +17,7 @@ import {
   writeWorkspaceFile,
 } from "@/lib/server/workspace";
 import { getUserId, unauthorized } from "@/lib/server/auth";
+import { crossSiteRejection } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 
@@ -53,6 +54,9 @@ const WriteFileSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const crossSite = crossSiteRejection(req);
+  if (crossSite) return crossSite;
+
   const userId = await getUserId();
   if (!userId) return unauthorized();
   let body: unknown;

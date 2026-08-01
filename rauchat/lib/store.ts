@@ -30,10 +30,35 @@ function loadConversations(userId: string): Conversation[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(storageKeyFor(userId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as Conversation[];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as Conversation[]) : [];
+    }
+    return adoptLegacyConversations(userId);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Before accounts existed, every conversation lived under one unkeyed
+ * localStorage entry. The first account to sign in on a browser that still
+ * has one claims it — and consumes it, so a second account signing in later
+ * does not inherit someone else's transcripts.
+ */
+function adoptLegacyConversations(userId: string): Conversation[] {
+  try {
+    const legacy = window.localStorage.getItem(STORAGE_KEY_PREFIX);
+    if (!legacy) return [];
+    const parsed = JSON.parse(legacy);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      window.localStorage.removeItem(STORAGE_KEY_PREFIX);
+      return [];
+    }
+    const conversations = parsed as Conversation[];
+    window.localStorage.setItem(storageKeyFor(userId), JSON.stringify(conversations));
+    window.localStorage.removeItem(STORAGE_KEY_PREFIX);
+    return conversations;
   } catch {
     return [];
   }
@@ -114,10 +139,25 @@ export function useConversations(userId: string | null): UseConversations {
   // Hydrate on mount and whenever the signed-in account changes.
   useEffect(() => {
     if (!userId) return;
-    if (loadedFor.current === userId) return;
+    const previous = loadedFor.current;
+    if (previous === userId) return;
     loadedFor.current = userId;
-    setConversations(loadConversations(userId));
-    setActiveId(null);
+    const stored = loadConversations(userId);
+
+    if (previous === null) {
+      // First hydration. The account arrives one fetch after mount, so the
+      // user may already have started a conversation — keep it rather than
+      // replacing state out from under them.
+      setConversations((pending) => {
+        if (!pending.length) return stored;
+        const stored_ids = new Set(stored.map((c) => c.id));
+        return [...pending.filter((c) => !stored_ids.has(c.id)), ...stored];
+      });
+    } else {
+      // A genuinely different account: replace wholesale, select nothing.
+      setConversations(stored);
+      setActiveId(null);
+    }
     setHydrated(true);
   }, [userId]);
 

@@ -8,12 +8,12 @@
  * session server-side (best-effort) and expires the session cookie itself.
  */
 
-import { NextResponse, type NextRequest } from "next/server";
 import { getWorkOS, withAuth } from "@workos-inc/authkit-nextjs";
+import { redirectTo } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const { sessionId } = await withAuth();
     if (sessionId) {
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     // No session, or the user behind it is already gone — nothing to revoke.
   }
 
-  const res = NextResponse.redirect(new URL("/sign-in", req.nextUrl.origin), 302);
+  const res = redirectTo("/sign-in");
   res.cookies.delete(process.env.WORKOS_COOKIE_NAME || "wos-session");
   return res;
 }

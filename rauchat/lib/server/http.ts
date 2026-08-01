@@ -8,34 +8,67 @@
  * silently sign the victim's browser into an attacker-controlled account.
  */
 
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+/**
+ * A 302 with a RELATIVE Location.
+ *
+ * Never build redirects from `req.nextUrl.origin`: Next derives that from the
+ * server's own bind address, so behind a TLS-terminating proxy (tailscale
+ * serve, Render) it is `http://localhost:3111` — the browser would be sent to
+ * an address it cannot reach. A relative Location is resolved by the browser
+ * against the URL in its address bar, which is correct everywhere and trusts
+ * no forwarded headers.
+ */
+export function redirectTo(path: string): NextResponse {
+  return new NextResponse(null, { status: 302, headers: { Location: path } });
+}
 
 /**
  * Rejects any state-changing request that did not originate from this app.
  * Returns a Response to send back, or null when the request is same-origin.
  */
 export function crossSiteRejection(req: NextRequest): Response | null {
-  // Sec-Fetch-Site is set by every browser that can mount this attack.
+  const rejected = () =>
+    Response.json({ error: "Cross-site request rejected." }, { status: 403 });
+
+  // Sec-Fetch-Site is set by the browser itself and cannot be forged by page
+  // script, so it is the authoritative signal whenever it is present.
   const site = req.headers.get("sec-fetch-site");
-  if (site && site !== "same-origin" && site !== "none") {
-    return Response.json({ error: "Cross-site request rejected." }, { status: 403 });
+  if (site) {
+    return site === "same-origin" || site === "none"
+      ? contentTypeRejection(req)
+      : rejected();
   }
 
-  // Origin covers non-browser clients and older browsers; when present it must match.
+  // Fallback for clients that omit Sec-Fetch-Site. Compare HOSTS, not full
+  // origins: behind a TLS-terminating proxy (tailscale serve, Render, any
+  // load balancer) the browser's Origin is https:// while this server sees
+  // itself as http://, and a scheme comparison would reject every request.
   const origin = req.headers.get("origin");
   if (origin) {
     let originHost: string;
     try {
-      originHost = new URL(origin).origin;
+      originHost = new URL(origin).host;
     } catch {
-      return Response.json({ error: "Cross-site request rejected." }, { status: 403 });
+      return rejected();
     }
-    if (originHost !== req.nextUrl.origin) {
-      return Response.json({ error: "Cross-site request rejected." }, { status: 403 });
-    }
+    // Compare against the Host the browser addressed. X-Forwarded-* is NOT
+    // consulted: it is attacker-settable, and trusting it would let a forged
+    // request declare its own identity and match itself.
+    const selfHost = req.headers.get("host") ?? req.nextUrl.host;
+    if (originHost !== selfHost) return rejected();
   }
 
-  // A real JSON fetch always declares itself; the form-based forgery cannot.
+  return contentTypeRejection(req);
+}
+
+/**
+ * A real JSON fetch always declares itself. The cross-site form forgery
+ * cannot: `enctype="text/plain"` is the only way to shape a valid JSON body
+ * from a form, and it cannot set this header.
+ */
+function contentTypeRejection(req: NextRequest): Response | null {
   const contentType = req.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().includes("application/json")) {
     return Response.json(
@@ -43,6 +76,5 @@ export function crossSiteRejection(req: NextRequest): Response | null {
       { status: 415 }
     );
   }
-
   return null;
 }

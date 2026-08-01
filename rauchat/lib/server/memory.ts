@@ -12,36 +12,16 @@
  */
 
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-
-const BASE_ROOT = path.resolve(
-  process.cwd(),
-  process.env.RAUCHAT_WORKSPACE || "./workspace"
-);
-
-const PROFILES_DIR = path.join(BASE_ROOT, "profiles");
-
-/** User ids become filenames, so restrict them to a safe alphabet. */
-function safeUserId(userId: string): string {
-  const safe = String(userId ?? "").replace(/[^a-zA-Z0-9_-]/g, "");
-  if (!safe) {
-    throw new Error("Invalid user id for memory access.");
-  }
-  return safe;
-}
-
-function memoryFilePath(userId: string): string {
-  return path.join(PROFILES_DIR, `${safeUserId(userId)}.memory.md`);
-}
+import { memoryFile, profilesDir } from "./paths";
 
 async function ensureProfilesDir(): Promise<void> {
-  await mkdir(PROFILES_DIR, { recursive: true });
+  await mkdir(profilesDir(), { recursive: true });
 }
 
 /** The raw memory markdown, or "" when the user has none yet. */
 export async function readMemory(userId: string): Promise<string> {
   try {
-    return await readFile(memoryFilePath(userId), "utf8");
+    return await readFile(memoryFile(userId), "utf8");
   } catch {
     return "";
   }
@@ -79,7 +59,7 @@ export async function appendMemory(userId: string, text: string): Promise<void> 
   const entry = formatEntry(text);
   if (!entry) return;
   await ensureProfilesDir();
-  await appendFile(memoryFilePath(userId), `${entry}\n`, "utf8");
+  await appendFile(memoryFile(userId), `${entry}\n`, "utf8");
 }
 
 /** Overwrites the whole file — used by the settings editor. */
@@ -89,5 +69,5 @@ export async function replaceMemory(
 ): Promise<void> {
   await ensureProfilesDir();
   const body = String(content ?? "").trimEnd();
-  await writeFile(memoryFilePath(userId), body ? `${body}\n` : "", "utf8");
+  await writeFile(memoryFile(userId), body ? `${body}\n` : "", "utf8");
 }

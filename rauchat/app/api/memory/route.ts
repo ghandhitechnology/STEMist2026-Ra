@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readMemory, replaceMemory } from "@/lib/server/memory";
 import { getUserId, unauthorized } from "@/lib/server/auth";
+import { crossSiteRejection } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,9 @@ const ReplaceMemorySchema = z.object({
 });
 
 export async function PUT(req: NextRequest) {
+  const crossSite = crossSiteRejection(req);
+  if (crossSite) return crossSite;
+
   const userId = await getUserId();
   if (!userId) return unauthorized();
   let body: unknown;

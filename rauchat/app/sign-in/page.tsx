@@ -17,6 +17,7 @@ const OAUTH_ERRORS: Record<string, string> = {
   state: "That sign-in link expired. Try again.",
   exchange: "Could not complete sign-in. Try again.",
   config: "Auth is not configured.",
+  provider: "That sign-in option isn't available. Try another.",
 };
 
 /** Seconds the resend button stays inert after a code is sent. */
@@ -38,7 +39,11 @@ export default function SignInPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const reason = params.get("error");
-    if (reason && OAUTH_ERRORS[reason]) setError(OAUTH_ERRORS[reason]);
+    // Any unrecognized reason still surfaces something — an unexplained
+    // bounce back to sign-in reads as the app being broken.
+    if (reason) {
+      setError(OAUTH_ERRORS[reason] ?? "Could not complete sign-in. Try again.");
+    }
     if (params.get("reset") === "1") {
       setNotice("Password updated. Sign in with your new password.");
     }

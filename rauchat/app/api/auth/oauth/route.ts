@@ -11,6 +11,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getWorkOS } from "@workos-inc/authkit-nextjs";
+import { redirectTo } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 
@@ -24,11 +25,7 @@ const OAUTH_COOKIE_MAX_AGE = 600; // 10 minutes — the flow is a single hop.
 export async function GET(req: NextRequest) {
   // Misconfiguration lands back on the branded screen rather than a raw JSON
   // page — this route is reached by a top-level navigation, not by fetch.
-  const backToSignIn = (reason: string) =>
-    NextResponse.redirect(
-      new URL(`/sign-in?error=${reason}`, req.nextUrl.origin),
-      302
-    );
+  const backToSignIn = (reason: string) => redirectTo(`/sign-in?error=${reason}`);
 
   const provider = req.nextUrl.searchParams.get("provider");
   if (!provider || !PROVIDERS.includes(provider as (typeof PROVIDERS)[number])) {
