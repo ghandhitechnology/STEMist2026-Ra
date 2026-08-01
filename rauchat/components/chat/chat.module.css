@@ -1799,6 +1799,27 @@
   background: var(--rau-border-faint);
 }
 
+/* slash-command skill menu (anchored above the composer shell) */
+.slashMenu {
+  composes: popover;
+  left: 0;
+  right: 0;
+  min-width: 0;
+}
+.popoverItemActive {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+.slashDesc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--rau-fs-mini);
+  color: var(--rau-text-quaternary);
+}
+
 /* §8 keyboard-only navigation — appears on first Tab */
 .skipLink {
   composes: secondaryBtn;

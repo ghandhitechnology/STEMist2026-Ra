@@ -20,7 +20,11 @@ import { SettingsModal } from "@/components/modals/SettingsModal";
 import { SkillsModal } from "@/components/modals/SkillsModal";
 import { WorkspaceModal } from "@/components/modals/WorkspaceModal";
 import { useConversations } from "@/lib/store";
-import { useChatStream, type StreamingMessage } from "@/lib/useChatStream";
+import {
+  EMPTY_STREAMING_STATE,
+  useChatStream,
+  type StreamingMessage,
+} from "@/lib/useChatStream";
 import { useTelemetry } from "@/lib/useTelemetry";
 import { useAutoTitle, type TitleAnimationMode } from "@/lib/useAutoTitle";
 import { DEFAULT_MODEL_ID, clampThinking, getModel } from "@/lib/models";
@@ -230,6 +234,13 @@ export default function Home() {
   const pendingConversationIdRef = useRef<string | null>(null);
   const wasStreamingRef = useRef(false);
 
+  // Render-side twin of pendingConversationIdRef: the conversation that owns
+  // whatever useChatStream currently holds (partial, finished text, or error).
+  // ChatView only sees the streaming state when this matches the active chat,
+  // so turns never bleed into new or other conversations. On error it stays
+  // set (the partial + banner belong to that chat until the next send).
+  const [streamOwnerId, setStreamOwnerId] = useState<string | null>(null);
+
   const appendAssistantTurn = useCallback(
     (conversationId: string, msg: StreamingMessage): Message => {
       const assistantMessage: Message = {
@@ -250,6 +261,7 @@ export default function Home() {
     onDone: (final) => {
       const conversationId = pendingConversationIdRef.current;
       pendingConversationIdRef.current = null;
+      setStreamOwnerId(null);
       if (!conversationId) return;
       const assistantMessage = appendAssistantTurn(conversationId, final);
       // First naming happens after the first completed exchange. The store
@@ -285,6 +297,7 @@ export default function Home() {
     ) {
       const conversationId = pendingConversationIdRef.current;
       pendingConversationIdRef.current = null;
+      setStreamOwnerId(null);
       const streamed = chat.streamingMessage;
       if (streamed && (streamed.content.trim() || streamed.toolEvents.length)) {
         appendAssistantTurn(conversationId, streamed);
@@ -320,6 +333,7 @@ export default function Home() {
 
       const model = getModel(conversation.modelId ?? modelChoice.modelId);
       pendingConversationIdRef.current = conversationId;
+      setStreamOwnerId(conversationId);
       void chat.send({
         messages: [...conversation.messages, userMessage],
         conversationId,
@@ -354,6 +368,7 @@ export default function Home() {
     const conversation = store.activeConversation;
     if (!conversation || conversation.messages.length === 0) return;
     pendingConversationIdRef.current = conversation.id;
+    setStreamOwnerId(conversation.id);
     void chat.send({
       messages: conversation.messages,
       conversationId: conversation.id,
@@ -370,6 +385,7 @@ export default function Home() {
       const history = conversation.messages.slice(0, idx);
       store.replaceMessages(conversation.id, history);
       pendingConversationIdRef.current = conversation.id;
+      setStreamOwnerId(conversation.id);
       void chat.send({
         messages: history,
         conversationId: conversation.id,
@@ -419,15 +435,15 @@ export default function Home() {
   }, [store]);
 
   const streamingConversationIds = useMemo(
-    () =>
-      chat.isStreaming && pendingConversationIdRef.current
-        ? [pendingConversationIdRef.current]
-        : [],
-    // pendingConversationIdRef is a ref; chat.isStreaming is what actually
-    // changes when it does.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chat.isStreaming]
+    () => (chat.isStreaming && streamOwnerId ? [streamOwnerId] : []),
+    [chat.isStreaming, streamOwnerId]
   );
+
+  // Streaming state is only visible in the conversation it belongs to.
+  const activeStreamingState =
+    streamOwnerId !== null && streamOwnerId === store.activeId
+      ? chat.state
+      : EMPTY_STREAMING_STATE;
 
   const telemetryDetail = telemetry.error
     ? telemetry.error
@@ -454,7 +470,12 @@ export default function Home() {
         gridTemplateColumns: telemetryCollapsed
           ? "auto minmax(0, 1fr) var(--rau-telemetry-w-rail)"
           : "auto minmax(0, 1fr) var(--rau-telemetry-w)",
+        // Without an explicit row, the implicit `auto` row grows with content
+        // and every column overflows 100vh — which breaks internal scrollers
+        // (their height: 100% resolves against the oversized row).
+        gridTemplateRows: "minmax(0, 1fr)",
         height: "100vh",
+        overflow: "hidden",
       }}
     >
       <Sidebar
@@ -471,7 +492,7 @@ export default function Home() {
 
       <ChatView
         conversation={store.activeConversation}
-        streamingState={chat.state}
+        streamingState={activeStreamingState}
         onSendMessage={handleSend}
         onStop={chat.stop}
         onRetry={handleRetry}
