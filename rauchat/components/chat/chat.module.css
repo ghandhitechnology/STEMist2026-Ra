@@ -50,6 +50,39 @@
   width: 28px;
   height: 28px;
 }
+/* labelled "auto" toggle, left of the attach button */
+.autoBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 28px;
+  padding: 0 var(--rau-space-4) 0 var(--rau-space-3);
+  border: var(--rau-hairline) solid transparent;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-tertiary);
+  font-family: inherit;
+  font-size: var(--rau-fs-mini);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    border-color var(--rau-dur-fast) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.autoBtn:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-secondary);
+}
+.autoBtnOn[aria-pressed="true"],
+.autoBtnOn[aria-pressed="true"]:hover {
+  background: var(--rau-fill-hover);
+  border-color: var(--rau-border-subtle);
+  color: var(--rau-accent);
+}
 
 /* §4.3 Ghost button */
 .ghostBtn {
@@ -1797,6 +1830,27 @@
   height: 1px;
   margin: var(--rau-space-2) calc(-1 * var(--rau-space-2));
   background: var(--rau-border-faint);
+}
+
+/* slash-command skill menu (anchored above the composer shell) */
+.slashMenu {
+  composes: popover;
+  left: 0;
+  right: 0;
+  min-width: 0;
+}
+.popoverItemActive {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+.slashDesc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--rau-fs-mini);
+  color: var(--rau-text-quaternary);
 }
 
 /* §8 keyboard-only navigation — appears on first Tab */

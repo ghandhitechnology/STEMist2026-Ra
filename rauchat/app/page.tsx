@@ -15,19 +15,34 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView, defaultResolveDownloadUrl } from "@/components/chat";
 import type { ComposerSubmission } from "@/components/chat";
 import { TelemetryPanel } from "@/components/telemetry";
+import { DiagramPanel } from "@/components/diagrams";
+import { collectDiagrams } from "@/lib/diagrams";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { SettingsModal } from "@/components/modals/SettingsModal";
 import { SkillsModal } from "@/components/modals/SkillsModal";
 import { WorkspaceModal } from "@/components/modals/WorkspaceModal";
 import { useConversations } from "@/lib/store";
-import { useChatStream, type StreamingMessage } from "@/lib/useChatStream";
+import {
+  EMPTY_STREAMING_STATE,
+  useChatStream,
+  type StreamingMessage,
+} from "@/lib/useChatStream";
 import { useTelemetry } from "@/lib/useTelemetry";
 import { useAutoTitle, type TitleAnimationMode } from "@/lib/useAutoTitle";
 import { DEFAULT_MODEL_ID, clampThinking, getModel } from "@/lib/models";
-import type { Conversation, Message, Skill, ToolEvent, ToolName, TraitSnapshot } from "@/lib/types";
+import type {
+  Diagram,
+  Conversation,
+  Message,
+  Skill,
+  ToolEvent,
+  ToolName,
+  TraitSnapshot,
+} from "@/lib/types";
 
 const TELEMETRY_COLLAPSED_KEY = "rauchat:telemetry-collapsed";
 const MODEL_CHOICE_KEY = "rauchat:model-choice";
+const AUTO_TOOLS_KEY = "rauchat:auto-tools";
 const DEFAULT_TOOLS: ToolName[] = [];
 
 function generateId(): string {
@@ -76,6 +91,28 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
+
+  // "/auto" mode: every tool is loaded each turn and the agent decides when
+  // to use them. Persisted so it survives reloads.
+  const [autoTools, setAutoTools] = useState(false);
+  useEffect(() => {
+    try {
+      setAutoTools(window.localStorage.getItem(AUTO_TOOLS_KEY) === "1");
+    } catch {
+      // localStorage unavailable — keep the default (off).
+    }
+  }, []);
+  const toggleAutoTools = useCallback(() => {
+    setAutoTools((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(AUTO_TOOLS_KEY, next ? "1" : "0");
+      } catch {
+        // best-effort persistence
+      }
+      return next;
+    });
+  }, []);
 
   // Restore the panel's collapse state once, on mount.
   useEffect(() => {
@@ -230,6 +267,13 @@ export default function Home() {
   const pendingConversationIdRef = useRef<string | null>(null);
   const wasStreamingRef = useRef(false);
 
+  // Render-side twin of pendingConversationIdRef: the conversation that owns
+  // whatever useChatStream currently holds (partial, finished text, or error).
+  // ChatView only sees the streaming state when this matches the active chat,
+  // so turns never bleed into new or other conversations. On error it stays
+  // set (the partial + banner belong to that chat until the next send).
+  const [streamOwnerId, setStreamOwnerId] = useState<string | null>(null);
+
   const appendAssistantTurn = useCallback(
     (conversationId: string, msg: StreamingMessage): Message => {
       const assistantMessage: Message = {
@@ -250,6 +294,7 @@ export default function Home() {
     onDone: (final) => {
       const conversationId = pendingConversationIdRef.current;
       pendingConversationIdRef.current = null;
+      setStreamOwnerId(null);
       if (!conversationId) return;
       const assistantMessage = appendAssistantTurn(conversationId, final);
       // First naming happens after the first completed exchange. The store
@@ -285,6 +330,7 @@ export default function Home() {
     ) {
       const conversationId = pendingConversationIdRef.current;
       pendingConversationIdRef.current = null;
+      setStreamOwnerId(null);
       const streamed = chat.streamingMessage;
       if (streamed && (streamed.content.trim() || streamed.toolEvents.length)) {
         appendAssistantTurn(conversationId, streamed);
@@ -320,6 +366,7 @@ export default function Home() {
 
       const model = getModel(conversation.modelId ?? modelChoice.modelId);
       pendingConversationIdRef.current = conversationId;
+      setStreamOwnerId(conversationId);
       void chat.send({
         messages: [...conversation.messages, userMessage],
         conversationId,
@@ -354,6 +401,7 @@ export default function Home() {
     const conversation = store.activeConversation;
     if (!conversation || conversation.messages.length === 0) return;
     pendingConversationIdRef.current = conversation.id;
+    setStreamOwnerId(conversation.id);
     void chat.send({
       messages: conversation.messages,
       conversationId: conversation.id,
@@ -370,6 +418,7 @@ export default function Home() {
       const history = conversation.messages.slice(0, idx);
       store.replaceMessages(conversation.id, history);
       pendingConversationIdRef.current = conversation.id;
+      setStreamOwnerId(conversation.id);
       void chat.send({
         messages: history,
         conversationId: conversation.id,
@@ -419,21 +468,64 @@ export default function Home() {
   }, [store]);
 
   const streamingConversationIds = useMemo(
-    () =>
-      chat.isStreaming && pendingConversationIdRef.current
-        ? [pendingConversationIdRef.current]
-        : [],
-    // pendingConversationIdRef is a ref; chat.isStreaming is what actually
-    // changes when it does.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chat.isStreaming]
+    () => (chat.isStreaming && streamOwnerId ? [streamOwnerId] : []),
+    [chat.isStreaming, streamOwnerId]
   );
+
+  // Streaming state is only visible in the conversation it belongs to.
+  const activeStreamingState =
+    streamOwnerId !== null && streamOwnerId === store.activeId
+      ? chat.state
+      : EMPTY_STREAMING_STATE;
 
   const telemetryDetail = telemetry.error
     ? telemetry.error
     : telemetry.model
       ? [telemetry.model, telemetry.layerInfo].filter(Boolean).join(" · ")
       : undefined;
+
+  // --- Diagrams: derived from the active conversation's tool events, so
+  // the transcript stays the single source of truth (lib/diagrams.ts).
+  const diagrams = useMemo(
+    () => collectDiagrams(store.activeConversation?.messages ?? []),
+    [store.activeConversation]
+  );
+
+  const [openDiagramId, setOpenDiagramId] = useState<string | null>(null);
+
+  // Opening a diagram folds telemetry to its rail so the three live
+  // columns fit; the user can expand it again from the rail if they want.
+  const handleOpenDiagram = useCallback((diagram: Diagram) => {
+    setOpenDiagramId(diagram.id);
+    setTelemetryCollapsed(true);
+  }, []);
+
+  // Auto-open the newest diagram of a finished turn, the way the panel
+  // appears on claude.ai — but never yank the panel away from a diagram
+  // the user opened themselves in this conversation.
+  const latestDiagramId = diagrams[0]?.id ?? null;
+  const lastAutoOpened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!latestDiagramId) return;
+    if (lastAutoOpened.current === latestDiagramId) return;
+    lastAutoOpened.current = latestDiagramId;
+    setOpenDiagramId(latestDiagramId);
+    setTelemetryCollapsed(true);
+  }, [latestDiagramId]);
+
+  // Switching conversations closes whatever was open; the new conversation's
+  // own diagrams (if any) auto-open through the effect above.
+  useEffect(() => {
+    setOpenDiagramId(null);
+    lastAutoOpened.current = null;
+  }, [store.activeId]);
+
+  const openDiagram = useMemo(
+    () => diagrams.find((a) => a.id === openDiagramId) ?? null,
+    [diagrams, openDiagramId]
+  );
+
+  const closeDiagram = useCallback(() => setOpenDiagramId(null), []);
 
   // Trait snapshots for the active conversation, derived straight from its
   // messages so there's one source of truth (no parallel history to drift).
@@ -451,10 +543,24 @@ export default function Home() {
         // Sidebar manages its own collapse/peek state internally and sizes
         // itself via CSS (264px <-> 56px rail); `auto` lets this track
         // follow that intrinsic width instead of leaving dead space.
-        gridTemplateColumns: telemetryCollapsed
-          ? "auto minmax(0, 1fr) var(--rau-telemetry-w-rail)"
-          : "auto minmax(0, 1fr) var(--rau-telemetry-w)",
+        // With a diagram open the telemetry column drops to its rail so the
+        // panel gets real width without squeezing the transcript.
+        gridTemplateColumns: [
+          "auto",
+          "minmax(0, 1fr)",
+          openDiagram ? "minmax(0, clamp(380px, 42%, 760px))" : null,
+          telemetryCollapsed
+            ? "var(--rau-telemetry-w-rail)"
+            : "var(--rau-telemetry-w)",
+        ]
+          .filter(Boolean)
+          .join(" "),
+        // Without an explicit row, the implicit `auto` row grows with content
+        // and every column overflows 100vh — which breaks internal scrollers
+        // (their height: 100% resolves against the oversized row).
+        gridTemplateRows: "minmax(0, 1fr)",
         height: "100vh",
+        overflow: "hidden",
       }}
     >
       <Sidebar
@@ -471,7 +577,7 @@ export default function Home() {
 
       <ChatView
         conversation={store.activeConversation}
-        streamingState={chat.state}
+        streamingState={activeStreamingState}
         onSendMessage={handleSend}
         onStop={chat.stop}
         onRetry={handleRetry}
@@ -491,14 +597,22 @@ export default function Home() {
         onToggleTelemetry={toggleTelemetry}
         onBranchConversation={handleBranchConversation}
         defaultTools={DEFAULT_TOOLS}
+        autoTools={autoTools}
+        onToggleAutoTools={toggleAutoTools}
         skills={skills}
         activeSkillId={activeSkillId}
         onSelectSkill={setActiveSkillId}
         onRegenerate={handleRegenerate}
         onBranch={handleBranchMessage}
         onInstallSkill={handleInstallSkill}
+        onOpenDiagram={handleOpenDiagram}
+        openDiagramId={openDiagramId}
         resolveDownloadUrl={resolveDownloadUrl}
       />
+
+      {openDiagram ? (
+        <DiagramPanel diagram={openDiagram} onClose={closeDiagram} />
+      ) : null}
 
       <TelemetryPanel
         status={telemetry.status}

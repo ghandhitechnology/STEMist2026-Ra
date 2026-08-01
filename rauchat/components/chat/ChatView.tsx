@@ -66,6 +66,9 @@ export type ChatViewProps = {
   /* composer */
   defaultTools?: readonly ToolName[];
   unavailableTools?: Partial<Record<ToolName, string>>;
+  /** "/auto" mode: all tools loaded every turn, agent decides usage. */
+  autoTools?: boolean;
+  onToggleAutoTools?: () => void;
   skills?: readonly Skill[];
   activeSkillId?: string | null;
   onSelectSkill?: (id: string | null) => void;
@@ -97,6 +100,8 @@ export const ChatView = memo(function ChatView({
   onOverflow,
   defaultTools,
   unavailableTools,
+  autoTools,
+  onToggleAutoTools,
   skills,
   activeSkillId,
   onSelectSkill,
@@ -259,6 +264,8 @@ export const ChatView = memo(function ChatView({
           runningTools={runningTools}
           unavailableTools={unavailableTools}
           defaultTools={defaultTools}
+          autoTools={autoTools}
+          onToggleAutoTools={onToggleAutoTools}
           skills={skills}
           activeSkillId={activeSkillId}
           onSelectSkill={onSelectSkill}

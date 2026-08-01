@@ -111,11 +111,11 @@ export function useConversations(): UseConversations {
     setActiveId((current) => (current === id ? null : current));
   }, []);
 
+  // Title changes deliberately leave updatedAt alone — the sidebar sorts by
+  // updatedAt, and renaming a chat must not move it in the list.
   const renameConversation = useCallback((id: string, title: string) => {
     setConversations((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, title, updatedAt: Date.now() } : c
-      )
+      prev.map((c) => (c.id === id ? { ...c, title } : c))
     );
   }, []);
 
@@ -134,9 +134,7 @@ export function useConversations(): UseConversations {
     (id: string, title: string, titledAtCount: number) => {
       setConversations((prev) =>
         prev.map((c) =>
-          c.id === id
-            ? { ...c, title, titledAtCount, updatedAt: Date.now() }
-            : c
+          c.id === id ? { ...c, title, titledAtCount } : c
         )
       );
     },

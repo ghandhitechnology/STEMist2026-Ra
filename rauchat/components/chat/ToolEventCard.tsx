@@ -15,6 +15,7 @@ import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react"
 import type { ToolEvent, ToolName } from "@/lib/types";
 import styles from "./chat.module.css";
 import {
+  IconDiagram,
   IconChevronDown,
   IconDownload,
   IconExternal,
@@ -26,6 +27,11 @@ import {
   IconWebSearch,
   type IconProps,
 } from "./icons";
+// Imported by path, not through the components/diagrams barrel, so this does
+// not pull DiagramPanel (which imports this module's barrel) into a cycle.
+import { DiagramCard } from "../diagrams/DiagramCard";
+import { diagramFromEvent } from "@/lib/diagrams";
+import type { Diagram } from "@/lib/types";
 
 /* ------------------------------------------------------------------
    Safe readers for the untyped `result` payload
@@ -132,6 +138,7 @@ const TOOL_META: Record<ToolName, ToolMeta> = {
   file_read: { label: "Read file", Icon: IconFileRead, monoArg: true },
   file_write: { label: "Write file", Icon: IconFileWrite, monoArg: true },
   skill_make: { label: "Skill maker", Icon: IconSkill, keepExpanded: true },
+  diagram: { label: "Diagram", Icon: IconDiagram, keepExpanded: true },
 };
 
 const TOOL_VERBS: Record<ToolName, string> = {
@@ -141,6 +148,7 @@ const TOOL_VERBS: Record<ToolName, string> = {
   file_read: "Reading file",
   file_write: "Writing file",
   skill_make: "Authoring skill",
+  diagram: "Building diagram",
 };
 
 /** Present-tense verb for the thinking indicator (§4.8). */
@@ -510,6 +518,9 @@ const BODIES: Record<ToolName, (p: BodyProps) => React.JSX.Element> = {
   file_read: FileReadBody,
   file_write: FileWriteBody,
   skill_make: SkillBody,
+  // Completed diagrams short-circuit to <DiagramCard/> before the card body
+  // renders; this only covers the running state.
+  diagram: () => <Shimmer rows={2} />,
 };
 
 /* ------------------------------------------------------------------
@@ -521,6 +532,10 @@ export type ToolEventCardProps = {
   /** Retry handler for the error state's ghost button. */
   onRetry?: (event: ToolEvent) => void;
   onInstallSkill?: (event: ToolEvent) => void;
+  /** Opens a diagram in the side panel. */
+  onOpenDiagram?: (diagram: Diagram) => void;
+  /** Id of the diagram currently open, so its card can show as active. */
+  openDiagramId?: string | null;
   /** Maps a result path/url to something the browser can fetch. */
   resolveDownloadUrl?: (target: string) => string;
 };
@@ -534,6 +549,8 @@ export const ToolEventCard = memo(function ToolEventCard({
   event,
   onRetry,
   onInstallSkill,
+  onOpenDiagram,
+  openDiagramId = null,
   resolveDownloadUrl = defaultResolveDownloadUrl,
 }: ToolEventCardProps) {
   const meta = TOOL_META[event.tool] ?? {
@@ -561,6 +578,19 @@ export const ToolEventCard = memo(function ToolEventCard({
   const arg = event.title;
   const argText = meta.monoArg ? middleTruncate(arg) : meta.quoteArg ? `“${arg}”` : arg;
   const Body = BODIES[event.tool];
+
+  // A finished diagram is the deliverable itself, not a tool trace — it
+  // replaces the collapsible card with its own openable card.
+  const diagram = diagramFromEvent(event);
+  if (diagram && onOpenDiagram) {
+    return (
+      <DiagramCard
+        diagram={diagram}
+        active={openDiagramId === diagram.id}
+        onOpen={onOpenDiagram}
+      />
+    );
+  }
 
   return (
     <section
@@ -696,7 +726,8 @@ export const ToolEventList = memo(function ToolEventList({
       j += 1;
     }
     const runLength = j - i;
-    if (runLength >= 3) {
+    // Diagrams are deliverables, not trace noise — never fold them away.
+    if (runLength >= 3 && tool !== "diagram") {
       nodes.push(
         <ToolEventGroup key={events[i].id} events={events.slice(i, j)} {...rest} />
       );

@@ -9,7 +9,7 @@
  */
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { Message, ToolEvent } from "@/lib/types";
+import type { Diagram, Message, ToolEvent } from "@/lib/types";
 import styles from "./chat.module.css";
 import { Markdown } from "./Markdown";
 import { ToolEventList, toolRunningVerb } from "./ToolEventCard";
@@ -32,6 +32,10 @@ export type MessageActions = {
   onMore?: (message: Message, anchor: HTMLElement) => void;
   onRetryToolEvent?: (event: ToolEvent) => void;
   onInstallSkill?: (event: ToolEvent) => void;
+  /** Opens a diagram produced in this turn in the side panel. */
+  onOpenDiagram?: (diagram: Diagram) => void;
+  /** Id of the open diagram, so its inline card reads as active. */
+  openDiagramId?: string | null;
   resolveDownloadUrl?: (target: string) => string;
 };
 
@@ -179,6 +183,8 @@ export const MessageItem = memo(function MessageItem({
   assistantName = "Rauchat",
   onRetryToolEvent,
   onInstallSkill,
+  onOpenDiagram,
+  openDiagramId,
   resolveDownloadUrl,
   ...actions
 }: MessageItemProps) {
@@ -244,6 +250,8 @@ export const MessageItem = memo(function MessageItem({
             events={toolEvents}
             onRetry={onRetryToolEvent}
             onInstallSkill={onInstallSkill}
+            onOpenDiagram={onOpenDiagram}
+            openDiagramId={openDiagramId}
             resolveDownloadUrl={resolveDownloadUrl}
           />
         ) : null}
