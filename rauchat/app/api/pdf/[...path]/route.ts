@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { WorkspacePathError, resolveWorkspacePath } from "@/lib/server/workspace";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,8 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
   const { path: segments } = await params;
   if (!segments || segments.length === 0) {
     return NextResponse.json({ error: "Missing file path." }, { status: 400 });
@@ -28,7 +31,7 @@ export async function GET(
 
   let absPath: string;
   try {
-    absPath = resolveWorkspacePath(relPath);
+    absPath = resolveWorkspacePath(userId, relPath);
   } catch (err) {
     if (err instanceof WorkspacePathError) {
       return NextResponse.json({ error: err.message }, { status: 400 });

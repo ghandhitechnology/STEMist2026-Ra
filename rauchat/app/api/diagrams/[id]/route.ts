@@ -4,6 +4,7 @@
  */
 
 import { readDiagram } from "@/lib/server/diagrams";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -11,9 +12,11 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
   const { id } = await params;
   try {
-    const diagram = await readDiagram(id);
+    const diagram = await readDiagram(userId, id);
     if (!diagram) {
       return Response.json({ error: "Diagram not found." }, { status: 404 });
     }

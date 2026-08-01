@@ -18,6 +18,12 @@ import { TelemetryPanel } from "@/components/telemetry";
 import { DiagramPanel } from "@/components/diagrams";
 import { collectDiagrams } from "@/lib/diagrams";
 import { Sidebar } from "@/components/sidebar/Sidebar";
+import {
+  AccountModal,
+  type Account,
+  type AccountProfile,
+  type AccountUser,
+} from "@/components/modals/AccountModal";
 import { SettingsModal } from "@/components/modals/SettingsModal";
 import { SkillsModal } from "@/components/modals/SkillsModal";
 import { WorkspaceModal } from "@/components/modals/WorkspaceModal";
@@ -80,7 +86,13 @@ function resolveDownloadUrl(target: string): string {
 }
 
 export default function Home() {
-  const store = useConversations();
+  // --- Account: the signed-in user + their profile. Unauthenticated goes to
+  // sign-in; authenticated-but-unprofiled goes through the first-run setup.
+  const [account, setAccount] = useState<Account | null>(null);
+
+  // Conversations are keyed by account, so the store stays empty until we
+  // know who is signed in.
+  const store = useConversations(account?.user.id ?? null);
 
   const [skills, setSkills] = useState<Skill[]>([]);
   const [filesCount, setFilesCount] = useState<number | undefined>(undefined);
@@ -89,6 +101,34 @@ export default function Home() {
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+
+  const refreshAccount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/profile");
+      if (res.status === 401) {
+        window.location.href = "/sign-in";
+        return;
+      }
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        profile: AccountProfile | null;
+        user: AccountUser;
+      };
+      if (!data.profile) {
+        window.location.replace("/setup");
+        return;
+      }
+      setAccount({ profile: data.profile, user: data.user });
+    } catch {
+      // Offline or transient failure — the footer chip stays in its
+      // placeholder state rather than bouncing the user out of the app.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshAccount();
+  }, [refreshAccount]);
 
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
 
@@ -568,6 +608,8 @@ export default function Home() {
         onOpenSkills={() => setSkillsOpen(true)}
         onOpenWorkspace={() => setWorkspaceOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenAccount={() => setAccountOpen(true)}
+        account={account}
         streamingConversationIds={streamingConversationIds}
         titleAnimations={titleAnimations}
         onTitleAnimationEnd={handleTitleAnimationEnd}
@@ -640,6 +682,12 @@ export default function Home() {
         telemetryStatus={telemetry.status}
         telemetryDetail={telemetryDetail}
         onConversationsCleared={handleConversationsCleared}
+      />
+      <AccountModal
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        account={account}
+        onUpdated={() => void refreshAccount()}
       />
     </div>
   );

@@ -21,6 +21,7 @@ import {
   IconExternal,
   IconFileRead,
   IconFileWrite,
+  IconMemory,
   IconPdf,
   IconResearch,
   IconSkill,
@@ -129,6 +130,8 @@ type ToolMeta = {
   keepExpanded?: boolean;
   /** Header argument is quoted (queries). */
   quoteArg?: boolean;
+  /** Header argument is suppressed — the body already carries the full sentence. */
+  hideArg?: boolean;
 };
 
 const TOOL_META: Record<ToolName, ToolMeta> = {
@@ -139,6 +142,10 @@ const TOOL_META: Record<ToolName, ToolMeta> = {
   file_write: { label: "Write file", Icon: IconFileWrite, monoArg: true },
   skill_make: { label: "Skill maker", Icon: IconSkill, keepExpanded: true },
   diagram: { label: "Diagram", Icon: IconDiagram, keepExpanded: true },
+  // toolEventTitle returns the saved sentence (quoted) for memory_add, and
+  // the card body below renders that same sentence via `detail` — hideArg
+  // keeps it from printing twice in the collapsed header.
+  memory_add: { label: "Memory", Icon: IconMemory, hideArg: true },
 };
 
 const TOOL_VERBS: Record<ToolName, string> = {
@@ -149,6 +156,7 @@ const TOOL_VERBS: Record<ToolName, string> = {
   file_write: "Writing file",
   skill_make: "Authoring skill",
   diagram: "Building diagram",
+  memory_add: "Saving to memory",
 };
 
 /** Present-tense verb for the thinking indicator (§4.8). */
@@ -521,6 +529,10 @@ const BODIES: Record<ToolName, (p: BodyProps) => React.JSX.Element> = {
   // Completed diagrams short-circuit to <DiagramCard/> before the card body
   // renders; this only covers the running state.
   diagram: () => <Shimmer rows={2} />,
+  // A memory save is a one-line fact; `detail` already carries it.
+  memory_add: ({ event }) => (
+    <EmptyLine>{event.detail ?? "Saved to memory."}</EmptyLine>
+  ),
 };
 
 /* ------------------------------------------------------------------
@@ -576,7 +588,13 @@ export const ToolEventCard = memo(function ToolEventCard({
   const toggle = useCallback(() => setExpanded((v) => !v), []);
 
   const arg = event.title;
-  const argText = meta.monoArg ? middleTruncate(arg) : meta.quoteArg ? `“${arg}”` : arg;
+  const argText = meta.hideArg
+    ? ""
+    : meta.monoArg
+      ? middleTruncate(arg)
+      : meta.quoteArg
+        ? `“${arg}”`
+        : arg;
   const Body = BODIES[event.tool];
 
   // A finished diagram is the deliverable itself, not a tool trace — it

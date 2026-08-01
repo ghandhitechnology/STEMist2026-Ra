@@ -9,7 +9,10 @@
   transition: width var(--rau-dur-slow) var(--rau-ease-inout);
 }
 
+/* The rail is the same surface, just narrower — it must keep the bg-l1 fill,
+   the right border and the column layout (§3.3). */
 .sidebarCollapsed {
+  composes: sidebar;
   width: var(--rau-sidebar-w-collapsed);
 }
 
@@ -415,18 +418,65 @@
   outline: none;
 }
 
+.accountPlaceholder {
+  height: 40px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sidebarCollapsed .accountPlaceholder {
+  justify-content: center;
+  padding: 0;
+}
+
 .avatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 3px;
+  width: 24px;
+  height: 24px;
+  /* Square avatar, never a circle or a blob (§3.3 footer). */
+  border-radius: var(--rau-radius-sm);
   background: var(--rau-bg-l3);
   border: 1px solid var(--rau-border-default);
+  object-fit: cover;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
   color: var(--rau-text-secondary);
+}
+
+.avatarPlaceholder {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-bg-l2);
+  border: 1px solid var(--rau-border-subtle);
+  flex-shrink: 0;
+}
+
+.accountPlaceholder .accountText {
+  gap: 4px;
+}
+
+.placeholderLineWide,
+.placeholderLineNarrow {
+  height: 8px;
+  border-radius: 1px;
+  background: var(--rau-bg-l2);
+}
+
+.placeholderLineWide {
+  width: 72%;
+}
+
+.placeholderLineNarrow {
+  width: 48%;
+  background: var(--rau-bg-inset);
 }
 
 .accountText {
@@ -450,16 +500,12 @@
   white-space: nowrap;
 }
 
-.accountPlan {
-  font-size: 11px;
-  color: var(--rau-text-quaternary);
-}
-
-.accountGear {
-  flex-shrink: 0;
+.accountEmail {
+  /* Real information, so it sits at the 12px floor tertiary is allowed at (§2.3). */
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
   color: var(--rau-text-tertiary);
-}
-
-.sidebarCollapsed .accountGear {
-  display: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

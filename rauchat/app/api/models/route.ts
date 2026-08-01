@@ -8,6 +8,7 @@
  */
 
 import { MODELS } from "@/lib/models";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,7 @@ async function getCatalogIds(): Promise<Set<string> | null> {
 }
 
 export async function GET() {
+  if (!(await getUserId())) return unauthorized();
   const catalog = await getCatalogIds();
   const models = MODELS.map((m) => ({
     ...m,

@@ -13,6 +13,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { MODELS, TITLE_MODEL_ID } from "@/lib/models";
 import { getOpenRouter } from "@/lib/server/openrouter";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,7 @@ Use the same language as the conversation. Never output hashtags, prefixes like 
 const MAX_TRANSCRIPT_CHARS = 6000;
 
 export async function POST(req: NextRequest) {
+  if (!(await getUserId())) return unauthorized();
   let body: unknown;
   try {
     body = await req.json();

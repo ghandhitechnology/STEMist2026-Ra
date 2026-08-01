@@ -13,11 +13,14 @@ import {
   listSkills,
   updateSkill,
 } from "@/lib/server/skills";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const skills = await listSkills();
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
+  const skills = await listSkills(userId);
   return NextResponse.json({ skills });
 }
 
@@ -28,6 +31,8 @@ const CreateSkillSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
   let body: unknown;
   try {
     body = await req.json();
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const skill = await createSkill(parsed.data);
+  const skill = await createSkill(userId, parsed.data);
   return NextResponse.json(skill, { status: 201 });
 }
 
@@ -57,6 +62,8 @@ const UpdateSkillSchema = z
   .refine((v) => Object.keys(v).length > 0, { message: "Empty patch." });
 
 export async function PATCH(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
     return NextResponse.json({ error: "Missing id query parameter." }, { status: 400 });
@@ -74,7 +81,7 @@ export async function PATCH(req: NextRequest) {
       { status: 400 }
     );
   }
-  const updated = await updateSkill(id, parsed.data);
+  const updated = await updateSkill(userId, id, parsed.data);
   if (!updated) {
     return NextResponse.json({ error: "Skill not found." }, { status: 404 });
   }
@@ -82,11 +89,13 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
     return NextResponse.json({ error: "Missing id query parameter." }, { status: 400 });
   }
-  const deleted = await deleteSkill(id);
+  const deleted = await deleteSkill(userId, id);
   if (!deleted) {
     return NextResponse.json({ error: "Skill not found." }, { status: 404 });
   }

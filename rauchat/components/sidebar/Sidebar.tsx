@@ -8,6 +8,7 @@
 
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { UseConversations } from "@/lib/store";
+import { accountInitials, type Account } from "../modals/AccountModal";
 import {
   IconFolder,
   IconGear,
@@ -44,6 +45,10 @@ export type SidebarProps = {
   onOpenSkills: () => void;
   onOpenWorkspace: () => void;
   onOpenSettings: () => void;
+  /** Opens the account modal from the footer chip. */
+  onOpenAccount: () => void;
+  /** Signed-in user + profile; null until GET /api/profile resolves. */
+  account: Account | null;
   /** IDs of conversations currently generating in the background. */
   streamingConversationIds?: string[];
   /** Per-conversation auto-naming animation, keyed by conversation id. */
@@ -58,6 +63,8 @@ export function Sidebar({
   onOpenSkills,
   onOpenWorkspace,
   onOpenSettings,
+  onOpenAccount,
+  account,
   streamingConversationIds,
   titleAnimations,
   onTitleAnimationEnd,
@@ -107,26 +114,21 @@ export function Sidebar({
 
   const showExpanded = !collapsed || peeking;
 
+  // Three shapes, no inline styles: the 56px rail, the same rail peeked open
+  // as a fixed overlay (§3.3), and the resting 264px panel.
+  const asideClass = collapsed
+    ? peeking
+      ? `${styles.sidebar} ${styles.peekOverlay}`
+      : styles.sidebarCollapsed
+    : styles.sidebar;
+
   let lastGroup: string | null = null;
 
   return (
     <aside
-      className={collapsed ? styles.sidebarCollapsed : styles.sidebar}
+      className={asideClass}
       onMouseEnter={handleRailEnter}
       onMouseLeave={handleRailLeave}
-      style={
-        collapsed && peeking
-          ? {
-              position: "fixed",
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: "var(--rau-sidebar-w)",
-              boxShadow: "var(--rau-elev-popover)",
-              zIndex: 40,
-            }
-          : undefined
-      }
     >
       <div className={styles.header}>
         {showExpanded && (
@@ -251,21 +253,44 @@ export function Sidebar({
       </div>
 
       <div className={styles.footer}>
-        <button
-          type="button"
-          className={styles.accountRow}
-          onClick={onOpenSettings}
-          aria-label="Open settings"
-        >
-          <span className={styles.avatar}>R</span>
-          <span className={styles.accountText}>
-            <span className={styles.accountName}>Local workspace</span>
-            <span className={styles.accountPlan}>Rauchat</span>
-          </span>
-          <span className={styles.accountGear}>
-            <IconGear size={14} />
-          </span>
-        </button>
+        {account ? (
+          <button
+            type="button"
+            className={styles.accountRow}
+            onClick={onOpenAccount}
+            aria-label="Open account"
+            title={account.user.email}
+          >
+            {account.user.profilePictureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className={styles.avatar}
+                src={account.user.profilePictureUrl}
+                alt=""
+                width={24}
+                height={24}
+              />
+            ) : (
+              <span className={styles.avatar} aria-hidden="true">
+                {accountInitials(account)}
+              </span>
+            )}
+            <span className={styles.accountText}>
+              <span className={styles.accountName}>
+                {account.profile.nickname}
+              </span>
+              <span className={styles.accountEmail}>{account.user.email}</span>
+            </span>
+          </button>
+        ) : (
+          <div className={styles.accountPlaceholder} aria-hidden="true">
+            <span className={styles.avatarPlaceholder} />
+            <span className={styles.accountText}>
+              <span className={styles.placeholderLineWide} />
+              <span className={styles.placeholderLineNarrow} />
+            </span>
+          </div>
+        )}
       </div>
     </aside>
   );

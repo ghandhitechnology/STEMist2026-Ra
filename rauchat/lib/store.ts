@@ -8,7 +8,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Conversation, Message } from "./types";
 
-const STORAGE_KEY = "rauchat.conversations.v1";
+/**
+ * Conversations are per browser AND per account: two people signing in on the
+ * same machine must never see each other's transcripts, so the signed-in
+ * WorkOS user id is part of the key.
+ */
+export const STORAGE_KEY_PREFIX = "rauchat.conversations.v1";
+
+function storageKeyFor(userId: string): string {
+  return `${STORAGE_KEY_PREFIX}:${userId}`;
+}
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -17,10 +26,10 @@ function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function loadConversations(): Conversation[] {
+function loadConversations(userId: string): Conversation[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKeyFor(userId));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -30,12 +39,33 @@ function loadConversations(): Conversation[] {
   }
 }
 
-function saveConversations(conversations: Conversation[]): void {
+function saveConversations(
+  userId: string,
+  conversations: Conversation[]
+): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    window.localStorage.setItem(
+      storageKeyFor(userId),
+      JSON.stringify(conversations)
+    );
   } catch {
     // Storage full or unavailable — persistence is best-effort.
+  }
+}
+
+/** Drops every account's stored conversations (Settings -> clear data). */
+export function clearAllStoredConversations(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const doomed: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) doomed.push(key);
+    }
+    for (const key of doomed) window.localStorage.removeItem(key);
+  } catch {
+    // Best-effort.
   }
 }
 
@@ -69,24 +99,33 @@ export type UseConversations = {
   replaceMessages: (conversationId: string, messages: Message[]) => void;
 };
 
-export function useConversations(): UseConversations {
+/**
+ * @param userId signed-in WorkOS user id. While null (the account is still
+ * loading) nothing is read or written, so one account's conversations can
+ * never be flushed into another's key.
+ */
+export function useConversations(userId: string | null): UseConversations {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const hydratedRef = useRef(false);
+  // The account whose conversations are currently in state.
+  const loadedFor = useRef<string | null>(null);
 
-  // Hydrate from localStorage on mount (client only).
+  // Hydrate on mount and whenever the signed-in account changes.
   useEffect(() => {
-    setConversations(loadConversations());
-    hydratedRef.current = true;
+    if (!userId) return;
+    if (loadedFor.current === userId) return;
+    loadedFor.current = userId;
+    setConversations(loadConversations(userId));
+    setActiveId(null);
     setHydrated(true);
-  }, []);
+  }, [userId]);
 
-  // Persist on every change after hydration.
+  // Persist on every change, but only into the account we hydrated from.
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    saveConversations(conversations);
-  }, [conversations]);
+    if (!userId || loadedFor.current !== userId) return;
+    saveConversations(userId, conversations);
+  }, [userId, conversations]);
 
   const createConversation = useCallback((title = "New chat"): Conversation => {
     const now = Date.now();

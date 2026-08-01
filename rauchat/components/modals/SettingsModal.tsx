@@ -9,13 +9,12 @@
 
 import { useEffect, useState } from "react";
 import type { TelemetryStatus } from "@/lib/types";
+// Clearing data drops every signed-in account's conversations on this browser.
+import { clearAllStoredConversations } from "@/lib/store";
 import { Modal } from "./Modal";
 import styles from "./SettingsModal.module.css";
 
 const SETTINGS_STORAGE_KEY = "rauchat:settings";
-/** Must match STORAGE_KEY in lib/store.ts — kept in sync manually since
- * that file does not export it. */
-const CONVERSATIONS_STORAGE_KEY = "rauchat.conversations.v1";
 
 export type RauchatSettings = {
   modelId: string;
@@ -106,7 +105,7 @@ export function SettingsModal({
 
   function handleClearConversations() {
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(CONVERSATIONS_STORAGE_KEY);
+      clearAllStoredConversations();
     }
     setConfirmingClear(false);
     setCleared(true);

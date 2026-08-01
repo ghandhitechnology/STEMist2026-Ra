@@ -10,6 +10,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import type { ToolName } from "@/lib/types";
 import { writeDiagram } from "./diagrams";
+import { appendMemory } from "./memory";
 import { createSkill } from "./skills";
 import {
   ensureWorkspaceDirs,
@@ -126,12 +127,13 @@ function resolveDdgUrl(href: string): string {
 
 export type PdfCreateResult = { path: string; pages: number; bytes: number };
 
-/** Renders a simply-styled PDF and saves it under workspace/exports. */
+/** Renders a simply-styled PDF and saves it under the user's exports dir. */
 export async function pdfCreate(
+  userId: string,
   title: string,
   markdownBody: string
 ): Promise<PdfCreateResult> {
-  await ensureWorkspaceDirs();
+  await ensureWorkspaceDirs(userId);
 
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -190,7 +192,7 @@ export async function pdfCreate(
   const bytes = await doc.save();
   const slug = slugify(title) || "document";
   const relPath = `exports/${slug}-${Date.now()}.pdf`;
-  const absPath = resolveWorkspacePath(relPath);
+  const absPath = resolveWorkspacePath(userId, relPath);
   await writeFile(absPath, bytes);
 
   return { path: relPath, pages: doc.getPageCount(), bytes: bytes.byteLength };
@@ -242,17 +244,19 @@ function slugify(text: string): string {
 // ---------------------------------------------------------------------------
 
 export async function fileRead(
+  userId: string,
   relPath: string
 ): Promise<{ path: string; content: string }> {
-  const content = await readWorkspaceFile(relPath);
+  const content = await readWorkspaceFile(userId, relPath);
   return { path: relPath, content };
 }
 
 export async function fileWrite(
+  userId: string,
   relPath: string,
   content: string
 ): Promise<{ path: string; bytesWritten: number }> {
-  await writeWorkspaceFile(relPath, content);
+  await writeWorkspaceFile(userId, relPath, content);
   return { path: relPath, bytesWritten: Buffer.byteLength(content, "utf8") };
 }
 
@@ -261,25 +265,41 @@ export async function fileWrite(
 // ---------------------------------------------------------------------------
 
 export async function skillMake(
+  userId: string,
   name: string,
   description: string,
   instructions: string
 ) {
-  return createSkill({ name, description, instructions });
+  return createSkill(userId, { name, description, instructions });
 }
 
 // ---------------------------------------------------------------------------
 // diagram
 // ---------------------------------------------------------------------------
 
-export async function diagramWrite(input: {
-  id: string;
-  title?: string;
-  kind?: string;
-  language?: string;
-  content: string;
-}) {
-  return writeDiagram(input);
+export async function diagramWrite(
+  userId: string,
+  input: {
+    id: string;
+    title?: string;
+    kind?: string;
+    language?: string;
+    content: string;
+  }
+) {
+  return writeDiagram(userId, input);
+}
+
+// ---------------------------------------------------------------------------
+// memory_add
+// ---------------------------------------------------------------------------
+
+export async function memoryAdd(
+  userId: string,
+  content: string
+): Promise<{ saved: true; content: string }> {
+  await appendMemory(userId, content);
+  return { saved: true, content };
 }
 
 // ---------------------------------------------------------------------------
@@ -396,10 +416,26 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
       required: ["id", "title", "kind", "content"],
     },
   },
+  {
+    name: "memory_add",
+    description:
+      "Save a lasting fact about the user to persistent memory that will be available in all future conversations. Use when the user shares a durable preference or fact about themselves, or explicitly asks you to remember something. Keep it to one concise sentence.",
+    input_schema: {
+      type: "object",
+      properties: {
+        content: {
+          type: "string",
+          description:
+            "The fact to remember, as one concise single-line sentence written about the user.",
+        },
+      },
+      required: ["content"],
+    },
+  },
 ];
 
 /**
- * The same five tools in OpenAI function-calling format, for the OpenRouter
+ * The same tools in OpenAI function-calling format, for the OpenRouter
  * chat path (lib/server/openrouter.ts). Derived from ANTHROPIC_TOOLS so the
  * two catalogs can never drift.
  */
@@ -411,6 +447,11 @@ export const OPENAI_TOOLS = ANTHROPIC_TOOLS.map((t) => ({
     parameters: t.input_schema as Record<string, unknown>,
   },
 }));
+
+function truncate(text: string, max: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
 
 /** A short human-readable primary-argument label for a tool call, used as the ToolEvent title. */
 export function toolEventTitle(
@@ -430,17 +471,20 @@ export function toolEventTitle(
       return String(input.name ?? "new skill");
     case "diagram":
       return String(input.title ?? input.id ?? "diagram");
+    case "memory_add":
+      return `"${truncate(String(input.content ?? ""), 72)}"`;
     default:
       return "";
   }
 }
 
 /**
- * Executes one of the five Anthropic-facing tools by name. Throws on
+ * Executes one of the Anthropic-facing tools by name. Throws on
  * failure — callers are responsible for catching and emitting an error
  * ToolEvent.
  */
 export async function executeTool(
+  userId: string,
   tool: ToolName,
   input: Record<string, unknown>
 ): Promise<{
@@ -462,7 +506,7 @@ export async function executeTool(
     case "pdf_create": {
       const title = String(input.title ?? "Untitled");
       const body = String(input.markdownBody ?? "");
-      const doc = await pdfCreate(title, body);
+      const doc = await pdfCreate(userId, title, body);
       return {
         result: doc,
         detail: `${doc.pages} page${doc.pages === 1 ? "" : "s"}`,
@@ -470,24 +514,24 @@ export async function executeTool(
     }
     case "file_read": {
       const relPath = String(input.path ?? "");
-      const file = await fileRead(relPath);
+      const file = await fileRead(userId, relPath);
       return { result: file };
     }
     case "file_write": {
       const relPath = String(input.path ?? "");
       const content = String(input.content ?? "");
-      const written = await fileWrite(relPath, content);
+      const written = await fileWrite(userId, relPath, content);
       return { result: written, detail: `${written.bytesWritten} bytes` };
     }
     case "skill_make": {
       const name = String(input.name ?? "");
       const description = String(input.description ?? "");
       const instructions = String(input.instructions ?? "");
-      const skill = await skillMake(name, description, instructions);
+      const skill = await skillMake(userId, name, description, instructions);
       return { result: skill };
     }
     case "diagram": {
-      const diagram = await diagramWrite({
+      const diagram = await diagramWrite(userId, {
         id: String(input.id ?? ""),
         title: input.title === undefined ? undefined : String(input.title),
         kind: input.kind === undefined ? undefined : String(input.kind),
@@ -508,6 +552,11 @@ export async function executeTool(
             ? `${diagram.kind} · created`
             : `${diagram.kind} · v${diagram.version}`,
       };
+    }
+    case "memory_add": {
+      const content = String(input.content ?? "");
+      const saved = await memoryAdd(userId, content);
+      return { result: saved, detail: truncate(content, 96) };
     }
     default:
       throw new Error(`Unknown tool: ${tool}`);

@@ -93,6 +93,13 @@ export const IconDiagram = (p: IconProps) => (
   </Svg>
 );
 
+/** Bookmark outline — memory_add tool card (distinct from IconFileWrite). */
+export const IconMemory = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4.5 2.25h7a1 1 0 0 1 1 1v10.5l-4.5-3.1-4.5 3.1V3.25a1 1 0 0 1 1-1z" />
+  </Svg>
+);
+
 /* ---------- chrome ---------- */
 
 export const IconChevronDown = (p: IconProps) => (

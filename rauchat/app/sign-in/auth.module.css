@@ -1,0 +1,369 @@
+/* app/sign-in/auth.module.css — shared styling for the /sign-in and /sign-up
+   screens (DESIGN.md §4.1 wordmark, §4.3 buttons, §4.12 inputs).
+   A single 380px card on the black substrate; one accent-filled button, the
+   wordmark notch, and the focused input border are the only amber in view. */
+
+.page {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--rau-bg-l0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--rau-space-11) var(--rau-space-8);
+}
+
+.shell {
+  width: 100%;
+  max-width: 380px;
+  animation: authEnter 170ms var(--rau-ease-standard) both;
+}
+
+@keyframes authEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- Wordmark lockup (§4.1) ---- */
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rau-space-4);
+  font-family: var(--rau-font-sans);
+  font-weight: 590;
+  font-size: 17px;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  white-space: nowrap;
+  margin-bottom: var(--rau-space-8);
+  cursor: default;
+  user-select: none;
+}
+
+.wordmarkRau {
+  color: var(--rau-text-primary);
+}
+
+.wordmarkChat {
+  color: var(--rau-text-tertiary);
+}
+
+.notch {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--rau-border-default);
+  border-radius: 2px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notch::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  width: 4px;
+  height: 4px;
+  background: var(--rau-accent);
+}
+
+/* ---- Card ---- */
+
+.card {
+  background: var(--rau-bg-l2);
+  border: 1px solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-xl);
+  padding: var(--rau-space-8);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--rau-fs-xl);
+  line-height: var(--rau-lh-xl);
+  font-weight: var(--rau-fw-semibold);
+  letter-spacing: var(--rau-ls-tight);
+  color: var(--rau-text-primary);
+}
+
+.subheading {
+  margin: var(--rau-space-3) 0 0;
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  color: var(--rau-text-tertiary);
+}
+
+/* ---- Form ---- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rau-space-5);
+  margin-top: var(--rau-space-7);
+}
+
+.nameRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--rau-space-5);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rau-space-3);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-secondary);
+}
+
+/* Label plus a trailing tertiary action ("Forgot password?"). */
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rau-space-5);
+}
+
+/* Control row per §4.12: 32px, 13px, radius 3px. */
+.input {
+  width: 100%;
+  height: 32px;
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-bg-inset);
+  border: 1px solid var(--rau-border-default);
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  color: var(--rau-text-primary);
+  caret-color: var(--rau-accent);
+  transition: border-color var(--rau-dur-fast) var(--rau-ease-standard),
+    background-color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.input::placeholder {
+  color: var(--rau-text-quaternary);
+}
+
+.input:hover {
+  border-color: var(--rau-border-strong);
+}
+
+/* The 1px amber border is the entire focus signal (§4.12) — no ring. */
+.input:focus,
+.input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--rau-accent);
+  background: var(--rau-bg-l2);
+}
+
+.input:disabled {
+  background: var(--rau-fill-disabled);
+  color: var(--rau-text-disabled);
+  cursor: not-allowed;
+}
+
+/* Keep autofill on the substrate instead of the UA's white slab. */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--rau-text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--rau-bg-inset) inset;
+  caret-color: var(--rau-accent);
+}
+
+.codeInput {
+  height: 40px;
+  text-align: center;
+  font-family: var(--rau-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--rau-fs-lg);
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+}
+
+/* ---- Error line ---- */
+
+.error {
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-danger);
+  margin: 0;
+}
+
+/* Quiet one-line confirmation above the form. A 2px semantic left rule is the
+   only color, matching the toast treatment (§4.14) — never amber, so the
+   card's accent budget stays with the focused input and the submit button. */
+.notice {
+  margin: var(--rau-space-6) 0 0;
+  padding-left: var(--rau-space-4);
+  border-left: 2px solid var(--rau-success);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-secondary);
+}
+
+/* ---- Buttons ---- */
+
+.submit {
+  height: 36px;
+  border: none;
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-accent);
+  color: var(--rau-text-on-accent);
+  font-family: inherit;
+  font-size: var(--rau-fs-sm);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  cursor: pointer;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard);
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--rau-accent-hover);
+}
+
+.submit:active:not(:disabled) {
+  background: var(--rau-accent-press);
+}
+
+.submit:disabled {
+  background: #3a2e19;
+  color: var(--rau-text-disabled);
+  cursor: not-allowed;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-5);
+  margin: var(--rau-space-7) 0;
+}
+
+.dividerRule {
+  flex: 1;
+  height: 1px;
+  background: var(--rau-border-subtle);
+}
+
+.dividerLabel {
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-tertiary);
+}
+
+.providers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rau-space-4);
+}
+
+.providerButton {
+  height: 36px;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  border: 1px solid var(--rau-border-default);
+  color: var(--rau-text-primary);
+  font-family: inherit;
+  font-size: var(--rau-fs-sm);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  cursor: pointer;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    border-color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.providerButton:hover:not(:disabled) {
+  background: var(--rau-fill-hover);
+  border-color: var(--rau-border-strong);
+}
+
+.providerButton:active:not(:disabled) {
+  background: var(--rau-fill-active);
+}
+
+.providerButton:disabled {
+  color: var(--rau-text-disabled);
+  border-color: var(--rau-border-subtle);
+  cursor: not-allowed;
+}
+
+.ghostLink {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-tertiary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.ghostLink:hover:not(:disabled) {
+  color: var(--rau-text-secondary);
+}
+
+.ghostLink:disabled {
+  color: var(--rau-text-disabled);
+  cursor: not-allowed;
+}
+
+/* Only the in-label link reads as a link; the escape-hatch buttons stay plain. */
+.labelRow .ghostLink {
+  align-self: center;
+}
+
+.labelRow .ghostLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rau-text-quaternary);
+}
+
+/* Two tertiary actions sharing one row under the primary button. */
+.ghostRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rau-space-5);
+}
+
+/* ---- Footer swap link ---- */
+
+.footer {
+  margin: var(--rau-space-7) 0 0;
+  text-align: center;
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  color: var(--rau-text-tertiary);
+}
+
+.footerLink {
+  color: var(--rau-text-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rau-text-quaternary);
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard),
+    text-decoration-color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.footerLink:hover {
+  color: var(--rau-text-link-hover);
+  text-decoration-color: var(--rau-accent);
+}

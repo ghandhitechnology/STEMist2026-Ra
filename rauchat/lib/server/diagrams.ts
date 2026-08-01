@@ -14,9 +14,11 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Diagram, DiagramKind, DiagramVersion } from "@/lib/types";
 import { DIAGRAM_KINDS } from "@/lib/types";
-import { WORKSPACE_ROOT } from "./workspace";
+import { workspaceRootFor } from "./workspace";
 
-export const DIAGRAMS_DIR = path.join(WORKSPACE_ROOT, "diagrams");
+export function diagramsDirFor(userId: string): string {
+  return path.join(workspaceRootFor(userId), "diagrams");
+}
 
 /** Revisions kept per diagram; older ones are dropped from the head of the list. */
 const MAX_VERSIONS = 20;
@@ -50,19 +52,22 @@ function normalizeKind(raw: unknown): DiagramKind {
   );
 }
 
-function fileFor(id: string): string {
-  return path.join(DIAGRAMS_DIR, `${id}.json`);
+function fileFor(userId: string, id: string): string {
+  return path.join(diagramsDirFor(userId), `${id}.json`);
 }
 
-async function ensureDir(): Promise<void> {
-  await mkdir(DIAGRAMS_DIR, { recursive: true });
+async function ensureDir(userId: string): Promise<void> {
+  await mkdir(diagramsDirFor(userId), { recursive: true });
 }
 
 /** Reads one diagram with its full version history, or null if absent. */
-export async function readDiagram(rawId: string): Promise<Diagram | null> {
+export async function readDiagram(
+  userId: string,
+  rawId: string
+): Promise<Diagram | null> {
   const id = normalizeDiagramId(rawId);
   try {
-    const raw = await readFile(fileFor(id), "utf8");
+    const raw = await readFile(fileFor(userId, id), "utf8");
     const parsed = JSON.parse(raw) as Diagram;
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.versions)) {
       return null;
@@ -75,18 +80,18 @@ export async function readDiagram(rawId: string): Promise<Diagram | null> {
 }
 
 /** All diagrams, newest first, without version bodies (list view). */
-export async function listDiagrams(): Promise<Diagram[]> {
-  await ensureDir();
+export async function listDiagrams(userId: string): Promise<Diagram[]> {
+  await ensureDir(userId);
   let names: string[];
   try {
-    names = await readdir(DIAGRAMS_DIR);
+    names = await readdir(diagramsDirFor(userId));
   } catch {
     return [];
   }
   const diagrams: Diagram[] = [];
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
-    const diagram = await readDiagram(name.slice(0, -".json".length));
+    const diagram = await readDiagram(userId, name.slice(0, -".json".length));
     if (diagram) diagrams.push({ ...diagram, versions: undefined });
   }
   return diagrams.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -104,15 +109,18 @@ export type WriteDiagramInput = {
  * Creates a diagram or appends a revision to an existing one. `kind` is
  * required on creation and optional (inherited) on revision.
  */
-export async function writeDiagram(input: WriteDiagramInput): Promise<Diagram> {
-  await ensureDir();
+export async function writeDiagram(
+  userId: string,
+  input: WriteDiagramInput
+): Promise<Diagram> {
+  await ensureDir(userId);
   const id = normalizeDiagramId(input.id);
   const content = typeof input.content === "string" ? input.content : "";
   if (!content.trim()) {
     throw new DiagramError("Diagram content must not be empty.");
   }
 
-  const existing = await readDiagram(id);
+  const existing = await readDiagram(userId, id);
   const kind = input.kind ? normalizeKind(input.kind) : existing?.kind;
   if (!kind) {
     throw new DiagramError("kind is required when creating a new diagram.");
@@ -137,7 +145,7 @@ export async function writeDiagram(input: WriteDiagramInput): Promise<Diagram> {
     versions,
   };
 
-  await writeFile(fileFor(id), JSON.stringify(diagram, null, 2), "utf8");
+  await writeFile(fileFor(userId, id), JSON.stringify(diagram, null, 2), "utf8");
   return diagram;
 }
 

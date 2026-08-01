@@ -16,17 +16,20 @@ import {
   readWorkspaceFile,
   writeWorkspaceFile,
 } from "@/lib/server/workspace";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
   const path = req.nextUrl.searchParams.get("path");
   try {
     if (path) {
-      const content = await readWorkspaceFile(path);
+      const content = await readWorkspaceFile(userId, path);
       return NextResponse.json({ path, content });
     }
-    const entries = await listWorkspaceFiles();
+    const entries = await listWorkspaceFiles(userId);
     // WorkspaceModal only browses files, not directories, and expects
     // `updatedAt` (its field name) rather than `mtime`.
     const files = entries
@@ -50,6 +53,8 @@ const WriteFileSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
   let body: unknown;
   try {
     body = await req.json();
@@ -66,7 +71,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await writeWorkspaceFile(parsed.data.path, parsed.data.content);
+    await writeWorkspaceFile(userId, parsed.data.path, parsed.data.content);
     return NextResponse.json({ success: true, path: parsed.data.path });
   } catch (err) {
     if (err instanceof WorkspacePathError) {

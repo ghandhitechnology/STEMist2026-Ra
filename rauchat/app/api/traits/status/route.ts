@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getTraitStatus } from "@/lib/server/traits";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,7 @@ export const runtime = "nodejs";
  * "12-24 · rank 8", `vectorSet` as the build tag, `detail` as the error copy.
  */
 export async function GET() {
+  if (!(await getUserId())) return unauthorized();
   const status = await getTraitStatus();
   const info = status.layerInfo;
   const layerInfo =

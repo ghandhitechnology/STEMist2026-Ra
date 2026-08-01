@@ -11,6 +11,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTraitSnapshot } from "@/lib/server/traits";
+import { getUserId, unauthorized } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,7 @@ const TraitsRequestSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  if (!(await getUserId())) return unauthorized();
   let body: unknown;
   try {
     body = await req.json();
