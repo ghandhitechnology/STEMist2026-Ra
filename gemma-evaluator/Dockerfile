@@ -3,6 +3,8 @@ FROM pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
     HF_HOME=/workspace/huggingface \
     VECTOR_DIR=/app/artifacts \
     MODEL_ID=google/gemma-4-12B-it \
@@ -13,7 +15,8 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
-RUN python -m pip install --no-cache-dir -r /app/requirements.txt
+RUN /usr/bin/python3 -m venv --system-site-packages "$VIRTUAL_ENV" \
+    && python -m pip install --no-cache-dir -r /app/requirements.txt
 
 COPY evaluator_service /app/evaluator_service
 COPY artifacts /app/artifacts
