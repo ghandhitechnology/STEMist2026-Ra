@@ -1,0 +1,214 @@
+.row {
+  position: relative;
+  height: 32px;
+  border-radius: var(--rau-radius-sm);
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard);
+}
+
+.row:hover {
+  background: var(--rau-fill-hover);
+}
+
+.row:hover .title {
+  color: var(--rau-text-primary);
+  padding-right: 28px;
+}
+
+.row:active {
+  background: var(--rau-fill-active);
+}
+
+.row:focus-visible {
+  box-shadow: var(--rau-focus-ring);
+  outline: none;
+}
+
+.rowSelected {
+  background: var(--rau-fill-selected);
+}
+
+.rowSelected .title {
+  color: var(--rau-text-primary);
+  font-weight: var(--rau-fw-medium);
+}
+
+.rowSelected:hover {
+  background: var(--rau-fill-selected-hover);
+}
+
+.selectedBar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 16px;
+  background: var(--rau-accent);
+  border-radius: 1px;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard),
+    padding-right var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.streamingDot {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--rau-radius-full);
+  background: var(--rau-accent);
+  flex-shrink: 0;
+  margin-left: 4px;
+  animation: rau-stream-pulse 1600ms var(--rau-ease-inout) infinite;
+}
+
+@keyframes rau-stream-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
+}
+
+.actionButton {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--rau-radius-xs);
+  background: transparent;
+  border: none;
+  color: var(--rau-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.actionButton:hover {
+  background: var(--rau-fill-active);
+  color: var(--rau-text-primary);
+}
+
+.actionButtonDanger:hover {
+  background: var(--rau-danger-surface);
+  color: var(--rau-danger-hover);
+}
+
+.actionButton:focus-visible {
+  box-shadow: var(--rau-focus-ring);
+  outline: none;
+}
+
+/* ---- Renaming state ---- */
+
+.renameInput {
+  height: 32px;
+  width: 100%;
+  background: var(--rau-bg-inset);
+  border: 1px solid var(--rau-accent);
+  border-radius: var(--rau-radius-sm);
+  padding: 0 8px;
+  font-size: 13px;
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-primary);
+  caret-color: var(--rau-accent);
+  outline: none;
+}
+
+/* ---- Inline delete confirm ---- */
+
+.confirmRow {
+  height: 32px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: var(--rau-danger-surface);
+  border: 1px solid var(--rau-border-danger);
+  border-radius: var(--rau-radius-sm);
+  padding: 0 6px 0 8px;
+}
+
+.confirmText {
+  font-size: 12px;
+  color: var(--rau-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.confirmButton {
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--rau-radius-xs);
+  font-size: 11px;
+  font-weight: var(--rau-fw-medium);
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--rau-text-secondary);
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.confirmButton:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+
+.confirmButtonDanger {
+  color: var(--rau-danger-hover);
+}
+
+.confirmButtonDanger:hover {
+  background: rgba(220, 74, 80, 0.18);
+}
+
+.confirmButton:focus-visible {
+  box-shadow: var(--rau-focus-ring);
+  outline: none;
+}

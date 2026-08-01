@@ -1,0 +1,269 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Rauchat design tokens — DESIGN.md v1.0 (normative)
+   Single dark theme. Token prefix: --rau-
+   ============================================================ */
+
+:root {
+  /* ---- 2.1 Color — background layers ---- */
+  /* Canvas & surfaces — L0 is the true black substrate */
+  --rau-bg-l0:            #000000; /* app canvas, transcript scroll area */
+  --rau-bg-l1:            #060607; /* sidebar, telemetry panel */
+  --rau-bg-l2:            #0B0B0D; /* cards, composer shell, user message block */
+  --rau-bg-l3:            #101013; /* raised: popovers, dropdown menus, tooltips */
+  --rau-bg-l4:            #16161A; /* modal surface, top-most overlay */
+  --rau-bg-inset:         #050506; /* code blocks, input wells, telemetry bar tracks */
+
+  /* Interaction fills — always alpha white so they compose on any layer */
+  --rau-fill-hover:       rgba(255,255,255,0.038);
+  --rau-fill-active:      rgba(255,255,255,0.068);
+  --rau-fill-selected:    rgba(255,255,255,0.055);
+  --rau-fill-selected-hover: rgba(255,255,255,0.082);
+  --rau-fill-disabled:    rgba(255,255,255,0.020);
+
+  /* Scrim */
+  --rau-scrim:            rgba(0,0,0,0.72);
+
+  /* ---- 2.2 Color — borders ---- */
+  --rau-border-faint:     #131316; /* internal dividers inside a card */
+  --rau-border-subtle:    #1C1C20; /* default container border */
+  --rau-border-default:   #26262B; /* inputs, buttons, interactive containers */
+  --rau-border-strong:    #34343B; /* hover on interactive containers */
+  --rau-border-loud:      #4A4A53; /* dragging, resize handles, active dividers */
+  --rau-border-accent:    #E8A33D;
+  --rau-border-danger:    #C4383D;
+
+  /* ---- 2.3 Color — text tiers ---- */
+  --rau-text-primary:     #EDEDEF; /* prose, headings, active labels */
+  --rau-text-secondary:   #A3A3AB; /* supporting copy, inactive nav labels */
+  --rau-text-tertiary:    #6D6D76; /* metadata, timestamps, axis pole labels */
+  --rau-text-quaternary:  #4A4A52; /* dormant values, disabled scaffolding */
+  --rau-text-disabled:    #3A3A41;
+  --rau-text-on-accent:   #140D02; /* only for the single accent-filled button */
+  --rau-text-link:        #EDEDEF; /* links are underlined, not colored */
+  --rau-text-link-hover:  #FFFFFF;
+
+  /* ---- 2.4 Color — accent ---- */
+  --rau-accent:           #E8A33D;
+  --rau-accent-hover:     #F2B457;
+  --rau-accent-press:     #C9862B;
+  --rau-accent-muted:     #8A6224; /* accent text at low emphasis */
+  --rau-accent-surface:   rgba(232,163,61,0.10); /* max-size 4px tall fill or 1px rule */
+  --rau-accent-surface-strong: rgba(232,163,61,0.18);
+  --rau-accent-track:     rgba(232,163,61,0.14);
+
+  /* ---- 2.5 Color — semantic states ---- */
+  --rau-success:          #3E9E6B;
+  --rau-success-surface:  rgba(62,158,107,0.10);
+  --rau-danger:           #DC4A50;
+  --rau-danger-hover:     #E76066;
+  --rau-danger-surface:   rgba(220,74,80,0.10);
+  --rau-warning:          #D4923A; /* deliberately accent-family; see DESIGN.md §2.5 */
+  --rau-warning-surface:  rgba(212,146,58,0.10);
+  --rau-neutral-status:   #6D6D76;
+
+  /* ---- 2.6 Color — telemetry ---- */
+  --rau-tel-axis-line:    #26262B; /* the horizontal track for each axis */
+  --rau-tel-center-tick:  #4A4A52; /* the 0.0 centre tick, 1px x 12px */
+  --rau-tel-grid:         #131316; /* ±0.5 gridlines, 1px dotted */
+  --rau-tel-pos:          #E8A33D; /* magnitude toward the FIRST-named pole */
+  --rau-tel-neg:          #9A9AA4; /* magnitude toward the SECOND-named pole */
+  --rau-tel-pos-dim:      rgba(232,163,61,0.28); /* stale (>1 turn old) */
+  --rau-tel-neg-dim:      rgba(154,154,164,0.28);
+  --rau-tel-dormant:      #232328; /* bar rendered when no data exists */
+  --rau-tel-spark:        #6D6D76;
+  --rau-tel-spark-head:   #E8A33D;
+
+  --rau-status-live:      #3E9E6B;
+  --rau-status-connecting:#E8A33D;
+  --rau-status-dormant:   #5A5A63;
+  --rau-status-error:     #DC4A50;
+
+  /* ---- 2.7 Typography ---- */
+  --rau-font-sans: var(--font-inter), "Inter var", "Inter", -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --rau-font-mono: "Berkeley Mono", "JetBrains Mono", ui-monospace,
+                   SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* size / line-height / weight / tracking */
+  --rau-fs-micro:   11px;  --rau-lh-micro:   16px;  /* uppercase section labels */
+  --rau-fs-mini:    12px;  --rau-lh-mini:    16px;  /* telemetry values, badges */
+  --rau-fs-xs:      13px;  --rau-lh-xs:      18px;  /* sidebar items, metadata */
+  --rau-fs-sm:      14px;  --rau-lh-sm:      20px;  /* UI default, buttons, inputs */
+  --rau-fs-base:    15px;  --rau-lh-base:    26px;  /* transcript prose */
+  --rau-fs-lg:      17px;  --rau-lh-lg:      26px;  /* h3 in prose */
+  --rau-fs-xl:      20px;  --rau-lh-xl:      28px;  /* h2 in prose, modal title */
+  --rau-fs-2xl:     24px;  --rau-lh-2xl:     32px;  /* h1 in prose, empty-state head */
+
+  --rau-fw-regular:  400;
+  --rau-fw-medium:   500;
+  --rau-fw-semibold: 590; /* variable axis; fall back to 600 for static Inter */
+
+  --rau-ls-tight:   -0.022em; /* ≥20px headings */
+  --rau-ls-snug:    -0.012em; /* 14–17px */
+  --rau-ls-normal:   0em;     /* 15px prose */
+  --rau-ls-wide:     0.04em;  /* 12px badges */
+  --rau-ls-caps:     0.085em; /* 11px uppercase labels */
+  --rau-ls-mono:    -0.005em;
+
+  /* ---- 2.8 Spacing (4px base grid — only these values) ---- */
+  --rau-space-0: 0px;
+  --rau-space-1: 2px;
+  --rau-space-2: 4px;
+  --rau-space-3: 6px;
+  --rau-space-4: 8px;
+  --rau-space-5: 12px;
+  --rau-space-6: 16px;
+  --rau-space-7: 20px;
+  --rau-space-8: 24px;
+  --rau-space-9: 32px;
+  --rau-space-10: 40px;
+  --rau-space-11: 48px;
+  --rau-space-12: 64px;
+  --rau-space-13: 96px;
+
+  /* ---- 2.9 Radii ---- */
+  --rau-radius-xs: 2px;  /* badges, tags, telemetry bar caps, checkbox */
+  --rau-radius-sm: 3px;  /* buttons, sidebar items, tool toggles, inputs */
+  --rau-radius-md: 5px;  /* cards, tool event cards, user message block */
+  --rau-radius-lg: 6px;  /* code blocks, popovers, menus */
+  --rau-radius-xl: 8px;  /* composer shell, modal surface — MAXIMUM */
+  --rau-radius-full: 9999px; /* ONLY: status dot, scrollbar thumb */
+
+  /* ---- 2.10 Borders, focus, elevation ---- */
+  --rau-hairline: 1px; /* all borders are 1px; use 0.5px never */
+  --rau-focus-ring: 0 0 0 1px var(--rau-bg-l0), 0 0 0 2px var(--rau-accent);
+  --rau-focus-ring-inset: inset 0 0 0 1px var(--rau-accent);
+  /* The only two permitted shadows in the product: */
+  --rau-elev-popover: 0 4px 16px -4px rgba(0,0,0,0.80), 0 1px 2px rgba(0,0,0,0.9);
+  --rau-elev-modal:   0 16px 48px -12px rgba(0,0,0,0.88), 0 2px 6px rgba(0,0,0,0.9);
+
+  /* ---- 2.11 Motion tokens ---- */
+  --rau-dur-instant: 90ms;   /* fills: hover/active background */
+  --rau-dur-fast:    130ms;  /* borders, text color, icon color, small transforms */
+  --rau-dur-base:    170ms;  /* popovers, tooltips, card enter, toggles */
+  --rau-dur-slow:    200ms;  /* panel collapse/expand, sidebar collapse */
+  --rau-dur-telemetry: 240ms;/* telemetry bar length interpolation ONLY */
+
+  --rau-ease-standard: cubic-bezier(0.20, 0, 0, 1);   /* default, decel */
+  --rau-ease-exit:     cubic-bezier(0.40, 0, 1, 1);   /* leaving the screen */
+  --rau-ease-inout:    cubic-bezier(0.45, 0, 0.20, 1);/* panel width, layout */
+  --rau-ease-linear:   linear;                        /* progress, marquees */
+
+  /* ---- 2.12 Layout dimensions ---- */
+  --rau-sidebar-w:            264px;
+  --rau-sidebar-w-collapsed:  56px;
+  --rau-telemetry-w:          320px;
+  --rau-telemetry-w-rail:     44px;  /* collapsed vertical rail */
+  --rau-measure:              720px; /* transcript column max-width */
+  --rau-measure-wide:         860px; /* "wide mode" user preference */
+  --rau-topbar-h:             48px;
+  --rau-composer-min-h:       52px;
+  --rau-composer-max-h:       240px;
+  --rau-row-h:                32px;  /* sidebar/menu row height */
+  --rau-row-h-lg:             36px;  /* primary rows, composer buttons */
+  --rau-icon:                 16px;  /* default icon box */
+  --rau-icon-sm:              14px;
+  --rau-z-panel: 10; --rau-z-sticky: 20; --rau-z-popover: 40;
+  --rau-z-modal: 60; --rau-z-toast: 80;
+}
+
+/* ============================================================
+   Base styles
+   ============================================================ */
+
+html,
+body {
+  height: 100%;
+}
+
+/* No page-level scrolling — the app shell owns the viewport (§3.1) */
+body {
+  overflow: hidden;
+  background: var(--rau-bg-l0);
+  color: var(--rau-text-primary);
+  font-family: var(--rau-font-sans);
+  font-size: var(--rau-fs-sm);
+  line-height: var(--rau-lh-sm);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv05" 1, "ss03" 1, "calt" 1;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--rau-font-mono);
+  letter-spacing: var(--rau-ls-mono);
+}
+
+/* Numeric readouts, telemetry values, timestamps, token counters (§2.7).
+   Apply .rau-num to every numeric readout; prose keeps proportional figures. */
+.rau-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Global selection (§4.12) */
+::selection {
+  background: rgba(232, 163, 61, 0.26);
+  color: #FFFFFF;
+}
+
+/* Focus is never suppressed; ring renders outside the element (§4) */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--rau-focus-ring);
+}
+
+/* ============================================================
+   Scrollbars (§2.13) — overlay-styled, never reserve layout space
+   ============================================================ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2A2A30 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #232328;
+  border: 3px solid transparent; /* inset via border trick → 4px visible thumb */
+  background-clip: padding-box;
+  border-radius: var(--rau-radius-full);
+  transition: background-color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #34343B;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:active {
+  background: #45454E;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ============================================================
+   Reduced motion (§5.6)
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

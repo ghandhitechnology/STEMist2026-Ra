@@ -1,0 +1,858 @@
+/* ============================================================
+   Model Telemetry panel — DESIGN.md §6 (normative)
+   Every colour resolves to a --rau-* token. No literal hex.
+   ============================================================ */
+
+/* ---------- shell ---------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--rau-bg-l1);
+  border-left: var(--rau-hairline) solid var(--rau-border-subtle);
+}
+
+.header {
+  flex: none;
+  height: var(--rau-topbar-h);
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  padding: 0 var(--rau-space-4) 0 var(--rau-space-6);
+  border-bottom: var(--rau-hairline) solid var(--rau-border-faint);
+}
+
+.headerTitle {
+  flex: none;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-tertiary);
+}
+
+.headerStatus {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-3);
+}
+
+.headerStatusLabel {
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-quaternary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.footer {
+  flex: none;
+  border-top: var(--rau-hairline) solid var(--rau-border-faint);
+}
+
+.section {
+  padding: var(--rau-space-6);
+  border-bottom: var(--rau-hairline) solid var(--rau-border-faint);
+}
+
+.sectionLast {
+  border-bottom: none;
+}
+
+.sectionLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rau-space-4);
+  margin-bottom: var(--rau-space-5);
+}
+
+.sectionLabel {
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-tertiary);
+}
+
+/* ---------- controls (§4.2 / §4.3) ---------- */
+
+.iconBtn {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-tertiary);
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.iconBtn:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-secondary);
+}
+.iconBtn:active {
+  background: var(--rau-fill-active);
+  color: var(--rau-text-primary);
+}
+.iconBtnSm {
+  width: 24px;
+  height: 24px;
+}
+.iconBtnDanger {
+  color: var(--rau-danger);
+}
+.iconBtnDanger:hover {
+  background: var(--rau-danger-surface);
+  color: var(--rau-danger-hover);
+}
+
+.secondaryBtn {
+  width: 100%;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rau-space-3);
+  padding: 0 var(--rau-space-5);
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-bg-l2);
+  border: var(--rau-hairline) solid var(--rau-border-default);
+  color: var(--rau-text-primary);
+  font-size: var(--rau-fs-xs);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    border-color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.secondaryBtn:hover {
+  background: var(--rau-border-faint);
+  border-color: var(--rau-border-strong);
+}
+.secondaryBtn:active {
+  background: var(--rau-bg-l2);
+  border-color: var(--rau-border-strong);
+}
+.secondaryBtn:disabled {
+  background: var(--rau-fill-disabled);
+  border-color: var(--rau-border-subtle);
+  color: var(--rau-text-disabled);
+  cursor: not-allowed;
+}
+
+.ghostBtn {
+  flex: none;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rau-space-2);
+  padding: 0 var(--rau-space-4);
+  border: none;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-secondary);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.ghostBtn:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+.ghostBtn:active {
+  background: var(--rau-fill-active);
+}
+.ghostBtnDanger {
+  color: var(--rau-danger);
+}
+.ghostBtnDanger:hover {
+  background: var(--rau-danger-surface);
+  color: var(--rau-danger-hover);
+}
+
+.ghostLink {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+  cursor: pointer;
+  border-radius: var(--rau-radius-xs);
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.ghostLink:hover {
+  color: var(--rau-text-secondary);
+}
+.ghostLinkOn {
+  color: var(--rau-text-secondary);
+}
+
+/* ---------- status dot (§6.1) ---------- */
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--rau-radius-full);
+  background: var(--rau-neutral-status);
+}
+.dotDormant {
+  background: transparent;
+  border: var(--rau-hairline) solid var(--rau-status-dormant);
+}
+.dotConnecting {
+  background: var(--rau-status-connecting);
+  animation: telPulse 1400ms var(--rau-ease-inout) infinite;
+}
+.dotLive {
+  background: var(--rau-status-live);
+  animation: telBreathe 1400ms var(--rau-ease-inout) infinite;
+}
+.dotDegraded {
+  background: var(--rau-warning);
+}
+.dotError {
+  background: var(--rau-status-error);
+}
+
+@keyframes telPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes telBreathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ---------- A. connection block (§6.1) ---------- */
+
+.connBlock {
+  position: relative;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  padding: 0 var(--rau-space-5);
+  background: var(--rau-bg-l2);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.connBlockError {
+  border-color: var(--rau-border-danger);
+}
+
+.connText {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--rau-space-3) 0;
+}
+
+.connLabel {
+  font-size: var(--rau-fs-mini);
+  line-height: 15px;
+  font-weight: var(--rau-fw-medium);
+  color: var(--rau-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.connDetail {
+  font-family: var(--rau-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--rau-fs-micro);
+  line-height: 15px;
+  letter-spacing: var(--rau-ls-mono);
+  color: var(--rau-text-quaternary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.connSweepTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--rau-accent-track);
+  overflow: hidden;
+}
+.connSweepRunner {
+  position: absolute;
+  inset: 0;
+  animation: telSweep 1100ms var(--rau-ease-linear) infinite;
+}
+.connSweepSeg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 1px;
+  background: var(--rau-accent);
+}
+
+@keyframes telSweep {
+  from { transform: translateX(-24px); }
+  to { transform: translateX(calc(100% + 24px)); }
+}
+
+/* ---------- metadata rows ---------- */
+
+.metaList {
+  margin-top: var(--rau-space-5);
+  display: flex;
+  flex-direction: column;
+}
+
+.metaRow {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rau-space-4);
+}
+
+.metaKey {
+  flex: none;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+}
+
+.metaVal {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--rau-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  letter-spacing: var(--rau-ls-mono);
+  color: var(--rau-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+.metaValPending {
+  color: var(--rau-text-quaternary);
+}
+
+.connActions {
+  margin-top: var(--rau-space-5);
+}
+
+.connCaption {
+  margin-top: var(--rau-space-3);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+  text-align: center;
+}
+
+.degradedStrip {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--rau-space-4);
+  margin-bottom: var(--rau-space-5);
+  border-radius: var(--rau-radius-xs);
+  background: var(--rau-warning-surface);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-warning);
+}
+
+/* ---------- B. axis rows (§6.2) ---------- */
+
+.axisList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rau-space-5);
+}
+
+.axisRow {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 34px;
+  margin: 0 calc(-1 * var(--rau-space-4));
+  padding: 0 var(--rau-space-4);
+  border: none;
+  background: transparent;
+  border-radius: var(--rau-radius-sm);
+  text-align: left;
+  cursor: default;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard);
+}
+.axisRow:hover {
+  background: var(--rau-fill-hover);
+}
+
+.labelLine {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--rau-space-3);
+  height: 16px;
+  margin-bottom: var(--rau-space-3);
+}
+
+.pole {
+  min-width: 0;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.poleNeg {
+  text-align: right;
+}
+.poleDormant {
+  color: var(--rau-text-quaternary);
+}
+.axisRow:hover .pole {
+  color: var(--rau-text-secondary);
+}
+.poleActive {
+  color: var(--rau-text-secondary);
+}
+.poleFlash {
+  color: var(--rau-text-primary);
+}
+
+.value {
+  font-family: var(--rau-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  letter-spacing: var(--rau-ls-mono);
+  color: var(--rau-text-tertiary);
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.valueStrong {
+  color: var(--rau-text-primary);
+}
+.valueDormant {
+  color: var(--rau-text-quaternary);
+}
+
+.delta {
+  position: absolute;
+  top: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+  padding: 0 3px;
+  background: var(--rau-bg-l1);
+  font-family: var(--rau-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--rau-fs-micro);
+  line-height: 14px;
+  letter-spacing: var(--rau-ls-mono);
+  color: var(--rau-text-quaternary);
+  pointer-events: none;
+  animation: telFadeIn var(--rau-dur-base) var(--rau-ease-standard);
+}
+.deltaPos {
+  right: calc(50% + 22px);
+}
+.deltaNeg {
+  left: calc(50% + 22px);
+}
+
+@keyframes telFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* bar */
+
+.bar {
+  position: relative;
+  height: 8px;
+  border-radius: var(--rau-radius-xs);
+  background: var(--rau-bg-inset);
+}
+
+.centerTick {
+  position: absolute;
+  left: calc(50% - 0.5px);
+  top: -2px;
+  width: 1px;
+  height: 12px;
+  background: var(--rau-tel-center-tick);
+}
+.centerTickDormant {
+  background: var(--rau-border-default);
+}
+
+.grid {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 8px;
+  background: var(--rau-tel-grid);
+}
+.gridPos {
+  left: 25%;
+}
+.gridNeg {
+  left: 75%;
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 8px;
+  border-radius: var(--rau-radius-xs);
+  transform: scaleX(0);
+  will-change: transform;
+  transition:
+    transform var(--rau-dur-telemetry) var(--rau-ease-standard),
+    opacity var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.fillPos {
+  right: 50%;
+  transform-origin: 100% 50%;
+  background: var(--rau-tel-pos);
+}
+.fillNeg {
+  left: 50%;
+  transform-origin: 0 50%;
+  background: var(--rau-tel-neg);
+}
+.fillPosStale {
+  background: var(--rau-tel-pos-dim);
+}
+.fillNegStale {
+  background: var(--rau-tel-neg-dim);
+}
+/* confidence < 0.35 → hollow: horizontal rules only, so scaleX never
+   distorts a stroke width. The centre tick and the marker cap the ends. */
+.fillHollow {
+  background: transparent;
+  border-top: var(--rau-hairline) solid var(--rau-border-default);
+  border-bottom: var(--rau-hairline) solid var(--rau-border-default);
+}
+
+/* score marker — a full-width carrier translated by ±50% of the track,
+   so the visible 2px bar lands exactly on the value. Transform only. */
+.markerCarrier {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 8px;
+  pointer-events: none;
+  will-change: transform;
+  transition: transform var(--rau-dur-telemetry) var(--rau-ease-standard);
+}
+.marker {
+  position: absolute;
+  left: calc(50% - 1px);
+  top: -2px;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--rau-text-primary);
+  transition:
+    background-color var(--rau-dur-fast) var(--rau-ease-standard),
+    height var(--rau-dur-fast) var(--rau-ease-standard),
+    top var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.markerDormant {
+  top: 0;
+  height: 8px;
+  background: var(--rau-tel-dormant);
+}
+.markerStale {
+  background: var(--rau-text-tertiary);
+}
+
+/* ---------- C. turn history (§6.3) ---------- */
+
+.histCaption {
+  height: 16px;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-family: var(--rau-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--rau-ls-mono);
+  color: var(--rau-text-quaternary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: var(--rau-space-2);
+}
+
+.histRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.histRow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: var(--rau-space-3);
+  height: 18px;
+}
+
+.histAbbr {
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-quaternary);
+}
+
+.histValue {
+  font-family: var(--rau-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--rau-fs-micro);
+  line-height: 14px;
+  letter-spacing: var(--rau-ls-mono);
+  color: var(--rau-text-tertiary);
+  text-align: right;
+}
+.histValueDormant {
+  color: var(--rau-text-quaternary);
+}
+
+.histPlot {
+  position: relative;
+  height: 14px;
+}
+.histSvg {
+  display: block;
+  width: 100%;
+  height: 14px;
+  overflow: visible;
+}
+
+.spark {
+  fill: none;
+  stroke: var(--rau-tel-spark);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.sparkDraw {
+  animation: telDraw 200ms var(--rau-ease-linear) 1;
+}
+@keyframes telDraw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.sparkHead {
+  fill: var(--rau-tel-spark-head);
+}
+.sparkCenterline {
+  stroke: var(--rau-tel-grid);
+  stroke-width: 1;
+}
+.sparkGapTick {
+  stroke: var(--rau-text-quaternary);
+  stroke-width: 1;
+}
+
+.crosshair {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--rau-border-strong);
+  pointer-events: none;
+}
+
+.histSurface {
+  position: relative;
+  cursor: crosshair;
+}
+
+/* stacked (dense) mode */
+
+.stackRow {
+  display: grid;
+  grid-template-columns: repeat(var(--tel-cells), minmax(0, 1fr));
+  gap: 1px;
+  height: 10px;
+  align-items: stretch;
+}
+.stackCell {
+  height: 10px;
+  border-radius: 1px;
+  background: var(--rau-tel-dormant);
+}
+
+/* ---------- D. substrate (§6.4) ---------- */
+
+.substrate {
+  padding: var(--rau-space-5);
+  border: var(--rau-hairline) dashed var(--rau-border-subtle);
+  border-radius: 4px;
+  background: transparent;
+}
+.substrateLive {
+  border-style: solid;
+}
+.substrateNote {
+  margin-top: var(--rau-space-4);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+}
+
+/* ---------- collapsed rail (§6.7) ---------- */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding-bottom: var(--rau-space-4);
+  background: var(--rau-bg-l1);
+  border-left: var(--rau-hairline) solid var(--rau-border-subtle);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.railHeader {
+  flex: none;
+  height: var(--rau-topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.railDotSlot {
+  flex: none;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 3px;
+}
+
+.railBars {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--rau-space-3);
+  padding-top: var(--rau-space-2);
+}
+
+.railBar {
+  position: relative;
+  width: 3px;
+  height: 40px;
+  border-radius: 1px;
+  background: var(--rau-bg-inset);
+}
+.railTick {
+  position: absolute;
+  left: -1px;
+  top: calc(50% - 0.5px);
+  width: 5px;
+  height: 1px;
+  background: var(--rau-tel-center-tick);
+}
+.railFill {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  height: 50%;
+  border-radius: 1px;
+  transform: scaleY(0);
+  will-change: transform;
+  transition: transform var(--rau-dur-telemetry) var(--rau-ease-standard);
+}
+.railFillPos {
+  bottom: 50%;
+  transform-origin: 50% 100%;
+  background: var(--rau-tel-pos);
+}
+.railFillNeg {
+  top: 50%;
+  transform-origin: 50% 0;
+  background: var(--rau-tel-neg);
+}
+.railStub {
+  position: absolute;
+  left: 0;
+  top: calc(50% - 1px);
+  width: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--rau-tel-dormant);
+}
+
+/* ---------- misc ---------- */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkDraw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

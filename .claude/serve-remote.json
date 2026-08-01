@@ -1,0 +1,15 @@
+{
+  "services": [
+    {
+      "name": "rauchat",
+      "cmd": "npm run dev -- --port 3111",
+      "cwd": "rauchat",
+      "port": 3111,
+      "match": "next dev",
+      "health": "/",
+      "env": {
+        "RAU_PUBLIC_HOST": "${TS_DNSNAME}"
+      }
+    }
+  ]
+}

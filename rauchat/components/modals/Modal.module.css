@@ -1,0 +1,118 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--rau-scrim);
+  z-index: var(--rau-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--rau-space-8);
+  opacity: 0;
+  transition: opacity 130ms var(--rau-ease-standard);
+}
+
+.scrimEnter {
+  opacity: 1;
+}
+
+.scrimExit {
+  opacity: 0;
+  transition: opacity 130ms var(--rau-ease-exit);
+}
+
+.panel {
+  background: var(--rau-bg-l4);
+  border: 1px solid var(--rau-border-default);
+  border-radius: var(--rau-radius-xl);
+  box-shadow: var(--rau-elev-modal);
+  width: 480px;
+  max-width: 100%;
+  max-height: min(640px, calc(100vh - 64px));
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px 24px;
+  opacity: 0;
+  transform: translateY(6px) scale(0.99);
+  transition:
+    opacity var(--rau-dur-base) var(--rau-ease-standard),
+    transform var(--rau-dur-base) var(--rau-ease-standard);
+}
+
+.panelLarge {
+  width: 640px;
+}
+
+.panelEnter {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.panelExit {
+  opacity: 0;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 130ms var(--rau-ease-exit),
+    transform 1ms;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rau-space-6);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--rau-fs-xl);
+  line-height: var(--rau-lh-xl);
+  font-weight: var(--rau-fw-semibold);
+  letter-spacing: var(--rau-ls-tight);
+  color: var(--rau-text-primary);
+  margin: 0;
+}
+
+.closeButton {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--rau-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.closeButton:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-secondary);
+}
+
+.closeButton:active {
+  background: var(--rau-fill-active);
+  color: var(--rau-text-primary);
+}
+
+.closeButton:focus-visible {
+  box-shadow: var(--rau-focus-ring);
+}
+
+.body {
+  margin-top: var(--rau-space-6);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.footer {
+  margin-top: var(--rau-space-7);
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--rau-space-3);
+}

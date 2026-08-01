@@ -1,0 +1,300 @@
+/**
+ * components/chat/ModelSelector.module.css
+ *
+ * DESIGN.md §3.4 (top bar model string), §4.10 (popover/dropdown menu),
+ * §4.13 (segmented control), §5 (motion budget).
+ * No shadows other than --rau-elev-popover, no gradients, no glow.
+ */
+
+.wrap {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------
+   Trigger — a ghost button standing in for §3.4's model string
+   ------------------------------------------------------------ */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rau-space-1);
+  height: 22px;
+  max-width: 180px;
+  padding: 0 var(--rau-space-2) 0 var(--rau-space-3);
+  border: var(--rau-hairline) solid transparent;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-tertiary);
+  font-family: inherit;
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  letter-spacing: var(--rau-ls-snug);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    border-color var(--rau-dur-fast) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.trigger:hover:not(:disabled) {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+.trigger:active:not(:disabled) {
+  background: var(--rau-fill-active);
+}
+.trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--rau-focus-ring);
+}
+.triggerOpen {
+  background: var(--rau-fill-selected);
+  color: var(--rau-text-primary);
+}
+.trigger:disabled {
+  color: var(--rau-text-quaternary);
+  cursor: default;
+}
+
+.triggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  flex: none;
+  transition: transform var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* ------------------------------------------------------------
+   Panel (§4.10)
+   ------------------------------------------------------------ */
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--rau-space-3));
+  left: 0;
+  z-index: var(--rau-z-popover);
+  width: 304px;
+  padding: var(--rau-space-2);
+  background: var(--rau-bg-l3);
+  border: var(--rau-hairline) solid var(--rau-border-default);
+  border-radius: var(--rau-radius-lg);
+  box-shadow: var(--rau-elev-popover);
+  animation: menuEnter var(--rau-dur-base) var(--rau-ease-standard);
+}
+
+@keyframes menuEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.list {
+  max-height: 320px;
+  overflow-y: auto;
+  outline: none;
+}
+
+.groupLabel {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--rau-space-4);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-quaternary);
+}
+
+/* ---- model row ---- */
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  width: 100%;
+  padding: var(--rau-space-3) var(--rau-space-4);
+  border: 0;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-secondary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.item:hover,
+.itemHighlighted {
+  background: var(--rau-fill-hover);
+}
+.item:active {
+  background: var(--rau-fill-active);
+}
+.itemText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.itemLabel {
+  display: block;
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.itemDesc {
+  display: block;
+  margin-top: var(--rau-space-1);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.check {
+  display: flex;
+  flex: none;
+  align-items: center;
+  color: var(--rau-accent);
+}
+
+.itemUnavailable {
+  cursor: not-allowed;
+}
+.itemUnavailable:hover,
+.itemUnavailable:active {
+  background: transparent;
+}
+.itemUnavailable .itemLabel {
+  color: var(--rau-text-disabled);
+}
+.itemUnavailable .itemDesc {
+  color: var(--rau-text-disabled);
+}
+.hint {
+  flex: none;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  letter-spacing: var(--rau-ls-wide);
+  color: var(--rau-text-quaternary);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-xs);
+  padding: 0 var(--rau-space-2);
+}
+
+.separator {
+  height: 1px;
+  margin: var(--rau-space-2) calc(-1 * var(--rau-space-2));
+  background: var(--rau-border-faint);
+}
+
+/* ------------------------------------------------------------
+   Thinking row + segmented control (§4.13)
+   ------------------------------------------------------------ */
+
+.thinking {
+  padding: var(--rau-space-4) var(--rau-space-4) var(--rau-space-3);
+}
+.thinkingHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--rau-space-4);
+}
+.thinkingLabel {
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-tertiary);
+}
+.thinkingModel {
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.segTrack {
+  position: relative;
+  display: flex;
+  height: 28px;
+  padding: 2px;
+  background: var(--rau-bg-inset);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: 4px;
+}
+.segIndicator {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: var(--rau-radius-xs);
+  background: var(--rau-bg-l3);
+  transition: transform var(--rau-dur-fast) var(--rau-ease-standard);
+  pointer-events: none;
+}
+.seg {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--rau-radius-xs);
+  background: transparent;
+  color: var(--rau-text-tertiary);
+  font-family: inherit;
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  letter-spacing: var(--rau-ls-snug);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.seg:hover:not(:disabled) {
+  color: var(--rau-text-secondary);
+}
+.seg:focus-visible {
+  outline: none;
+  box-shadow: var(--rau-focus-ring);
+}
+.segOn {
+  color: var(--rau-text-primary);
+}
+.seg:disabled {
+  color: var(--rau-text-disabled);
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
