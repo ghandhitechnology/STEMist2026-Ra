@@ -17,6 +17,7 @@ import { getWorkOS } from "@workos-inc/authkit-nextjs";
 import { getUserId, unauthorized } from "@/lib/server/auth";
 import { workspaceRootFor } from "@/lib/server/workspace";
 import { deleteProfile, profilesDir } from "@/lib/server/profile";
+import { isLocalFullAccessEnabled } from "@/lib/local-access";
 
 export const runtime = "nodejs";
 
@@ -32,13 +33,13 @@ export async function DELETE() {
   const userId = await getUserId();
   if (!userId) return unauthorized();
 
-  // 1. Delete the identity FIRST, so a failure here is a true no-op and the
-  //    user keeps everything rather than losing their data to a half-delete.
-  await getWorkOS().userManagement.deleteUser(userId);
+  // WorkOS has no identity for a local full-access session. In normal mode,
+  // delete the identity first so a failure is a true no-op.
+  if (!isLocalFullAccessEnabled()) {
+    await getWorkOS().userManagement.deleteUser(userId);
+  }
 
-  // 2. Wipe the sandboxed workspace (skills, exports, files) and the account
-  //    metadata. The identity is already gone, so failures here leave only
-  //    orphaned files — never a live account with missing data.
+  // Wipe the sandboxed workspace (skills, exports, files) and account metadata.
   try {
     await rm(workspaceRootFor(userId), { recursive: true, force: true });
     await deleteProfile(userId);

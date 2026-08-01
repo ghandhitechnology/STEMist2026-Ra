@@ -10,10 +10,15 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getWorkOS, withAuth } from "@workos-inc/authkit-nextjs";
+import { isLocalFullAccessEnabled } from "@/lib/local-access";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  if (isLocalFullAccessEnabled()) {
+    return NextResponse.redirect(new URL("/", req.nextUrl.origin), 302);
+  }
+
   try {
     const { sessionId } = await withAuth();
     if (sessionId) {
