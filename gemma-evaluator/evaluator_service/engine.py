@@ -21,6 +21,11 @@ class ProjectionInputError(ValueError):
     pass
 
 
+class _LayerCaptured(Exception):
+    """Control-flow sentinel: the target layer's output has been captured,
+    so the remaining decoder layers can be skipped entirely."""
+
+
 class GemmaEvaluator:
     def __init__(self, settings: Settings, bundle: ArtifactBundle) -> None:
         if settings.model_id != bundle.model_id:
@@ -32,6 +37,7 @@ class GemmaEvaluator:
         self.processor: Any | None = None
         self.model: Any | None = None
         self.device: torch.device | None = None
+        self.target_layer: torch.nn.Module | None = None
         self.unit_vectors: torch.Tensor | None = None
         # Calibration tensors keyed by chat-model id; None is the default
         # table (artifact values plus any "default" recenter overrides).
@@ -81,6 +87,12 @@ class GemmaEvaluator:
                 self.processor = processor
                 self.model = model
                 self.device = device
+                layers = _decoder_layers(model)
+                if not 0 <= self.bundle.shared_layer < len(layers):
+                    raise RuntimeError(
+                        "Artifact layer is outside the model decoder range."
+                    )
+                self.target_layer = layers[self.bundle.shared_layer]
                 self.unit_vectors = self.bundle.unit_vectors.float().to(device)
                 default_table = self.settings.trait_recenter["default"]
                 model_tables = self.settings.trait_recenter["models"]
@@ -139,19 +151,34 @@ class GemmaEvaluator:
         )
         input_ids = torch.tensor([full_ids], dtype=torch.long, device=self.device)
         attention_mask = torch.ones_like(input_ids)
-        outputs = self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            output_hidden_states=True,
-            use_cache=False,
-            return_dict=True,
-        )
-        hidden_states = _layer_outputs_only(
-            _get_hidden_states(outputs), self._num_layers()
-        )
-        if not 0 <= self.bundle.shared_layer < len(hidden_states):
-            raise RuntimeError("Artifact layer is outside the model decoder range.")
-        activation = hidden_states[self.bundle.shared_layer][
+
+        # Run the decoder only up to the artifact layer: a forward hook on
+        # that layer captures its output (identical to what
+        # output_hidden_states would report for it) and aborts the pass, so
+        # the layers above it are never computed and no other layer's
+        # hidden states are ever materialized.
+        captured: list[torch.Tensor] = []
+
+        def capture(_module: Any, _inputs: Any, output: Any) -> None:
+            captured.append(output[0] if isinstance(output, tuple) else output)
+            raise _LayerCaptured
+
+        assert self.target_layer is not None
+        handle = self.target_layer.register_forward_hook(capture)
+        try:
+            self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                use_cache=False,
+                return_dict=True,
+            )
+            raise RuntimeError("The artifact layer hook never fired.")
+        except _LayerCaptured:
+            pass
+        finally:
+            handle.remove()
+
+        activation = captured[0][
             0, response_start:response_end, :
         ].float().mean(dim=0)
         if activation.numel() != self.unit_vectors.shape[1]:
@@ -174,7 +201,7 @@ class GemmaEvaluator:
             for axis, raw in zip(self.bundle.axes, raw_scores, strict=True)
         }
 
-        del outputs, hidden_states, activation, raw_scores, signed_scores
+        del captured, activation, raw_scores, signed_scores
         gc.collect()
         return {
             "readings": readings,
@@ -246,10 +273,26 @@ class GemmaEvaluator:
             )
         return full_ids, response_start, response_end, truncated
 
-    def _num_layers(self) -> int:
-        assert self.model is not None
-        text_config = getattr(self.model.config, "text_config", self.model.config)
-        return int(text_config.num_hidden_layers)
+def _decoder_layers(model: Any) -> Any:
+    """Locate the decoder-layer ModuleList regardless of multimodal nesting.
+
+    The list is identified by its length matching the text config's
+    num_hidden_layers; hooking layers[i] observes the same tensor that
+    output_hidden_states would report as the output of decoder layer i.
+    """
+    text_config = getattr(model.config, "text_config", model.config)
+    num_layers = int(text_config.num_hidden_layers)
+    matches = [
+        (name, module)
+        for name, module in model.named_modules()
+        if isinstance(module, torch.nn.ModuleList) and len(module) == num_layers
+    ]
+    if not matches:
+        raise RuntimeError("Could not locate the Gemma decoder layer list.")
+    for name, module in matches:
+        if name.endswith("layers"):
+            return module
+    return matches[0][1]
 
 
 def _clean_bounds(token_ids: list[int], special_ids: set[int]) -> tuple[int, int]:
@@ -274,34 +317,3 @@ def _find_last_subsequence(sequence: list[int], subsequence: list[int]) -> int:
     return last
 
 
-def _get_hidden_states(outputs: Any) -> tuple[torch.Tensor, ...]:
-    for attribute in ("hidden_states", "decoder_hidden_states"):
-        value = getattr(outputs, attribute, None)
-        if value is not None:
-            return tuple(value)
-    for nested_attribute in (
-        "language_model_output",
-        "text_model_output",
-        "model_output",
-    ):
-        nested = getattr(outputs, nested_attribute, None)
-        if nested is None:
-            continue
-        for attribute in ("hidden_states", "decoder_hidden_states"):
-            value = getattr(nested, attribute, None)
-            if value is not None:
-                return tuple(value)
-    raise RuntimeError("Gemma output did not contain decoder hidden states.")
-
-
-def _layer_outputs_only(
-    hidden_states: tuple[torch.Tensor, ...], num_layers: int
-) -> tuple[torch.Tensor, ...]:
-    if len(hidden_states) == num_layers + 1:
-        return hidden_states[1:]
-    if len(hidden_states) == num_layers:
-        return hidden_states
-    raise RuntimeError(
-        f"Expected {num_layers} or {num_layers + 1} hidden states, "
-        f"received {len(hidden_states)}."
-    )

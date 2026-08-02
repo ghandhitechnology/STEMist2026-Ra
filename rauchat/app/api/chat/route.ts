@@ -41,7 +41,9 @@ import { readMemory } from "@/lib/server/memory";
 export const runtime = "nodejs";
 
 const MAX_TOOL_TURNS = 8;
-const MAX_TRAIT_CONTEXT_CHARS = 16000;
+// ~6k tokens of context for the evaluator (its own MAX_SEQUENCE_TOKENS
+// window is the final authority and must be raised in tandem).
+const MAX_TRAIT_CONTEXT_CHARS = 20000;
 // Diagrams are written in full as a single tool argument, so the ceiling has
 // to fit a complete app, not just a chat reply.
 const MAX_TOKENS = 16384;
@@ -98,17 +100,35 @@ function buildTraitEvaluationPrompt(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   evidence: string[]
 ): string {
-  const latestUser = [...messages]
-    .reverse()
-    .find((message) => message.role === "user")?.content.trim();
+  const latestUserIndex = messages.map((m) => m.role).lastIndexOf("user");
+  const latestUser =
+    latestUserIndex >= 0 ? messages[latestUserIndex].content.trim() : "";
   const userSection = latestUser || "Evaluate the assistant response.";
-  if (!evidence.length) return userSection.slice(-MAX_TRAIT_CONTEXT_CHARS);
-  const combined = [
-    `User request:\n${userSection}`,
-    `Tool/reference context used by the assistant:\n${evidence.join("\n\n")}`,
-  ].join("\n\n");
-  // Keep the most recent evidence when tool output exceeds the evaluator window.
-  return combined.slice(-MAX_TRAIT_CONTEXT_CHARS);
+  const history = latestUserIndex > 0 ? messages.slice(0, latestUserIndex) : [];
+
+  // First turn with no tool output keeps the bare-question format.
+  if (!history.length && !evidence.length) {
+    return userSection.slice(-MAX_TRAIT_CONTEXT_CHARS);
+  }
+
+  const sections: string[] = [];
+  if (history.length) {
+    const transcript = history
+      .map(
+        (m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`
+      )
+      .join("\n\n");
+    sections.push(`Conversation so far:\n${transcript}`);
+  }
+  sections.push(`Latest user request:\n${userSection}`);
+  if (evidence.length) {
+    sections.push(
+      `Tool/reference context used by the assistant:\n${evidence.join("\n\n")}`
+    );
+  }
+  // Tail-slice: the oldest conversation turns drop first; the latest request
+  // and evidence survive. The evaluator applies its own token window on top.
+  return sections.join("\n\n").slice(-MAX_TRAIT_CONTEXT_CHARS);
 }
 
 function buildSkillSection(skills: Skill[]): string {
