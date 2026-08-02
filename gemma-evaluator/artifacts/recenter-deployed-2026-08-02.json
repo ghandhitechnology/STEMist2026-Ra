@@ -1,105 +1,105 @@
 {
     "default": {
         "factual": {
-            "threshold": -56.938,
-            "scale": 3.092
+            "threshold": -57.397,
+            "scale": 3.153
         },
         "serious": {
-            "threshold": 33.748,
-            "scale": 4.261
+            "threshold": 33.987,
+            "scale": 4.085
         },
         "casual": {
-            "threshold": -37.859,
-            "scale": 3.308
+            "threshold": -38.013,
+            "scale": 3.133
         },
         "creative": {
-            "threshold": 7.693,
-            "scale": 2.024
+            "threshold": 7.739,
+            "scale": 1.791
         },
         "honest": {
-            "threshold": -50.745,
-            "scale": 2.892
+            "threshold": -51.025,
+            "scale": 2.702
         },
         "confident": {
-            "threshold": 33.04,
-            "scale": 2.294
+            "threshold": 32.99,
+            "scale": 2.192
         },
         "empathetic": {
-            "threshold": -35.341,
-            "scale": 2.102
+            "threshold": -35.367,
+            "scale": 2.104
         },
         "calm": {
-            "threshold": 49.334,
-            "scale": 3.094
+            "threshold": 49.459,
+            "scale": 2.827
         }
     },
     "models": {
         "anthropic/claude-sonnet-5": {
             "factual": {
-                "threshold": -56.938,
-                "scale": 3.092
+                "threshold": -57.397,
+                "scale": 3.153
             },
             "serious": {
-                "threshold": 33.748,
-                "scale": 4.261
+                "threshold": 33.987,
+                "scale": 4.085
             },
             "casual": {
-                "threshold": -37.859,
-                "scale": 3.308
+                "threshold": -38.013,
+                "scale": 3.133
             },
             "creative": {
-                "threshold": 7.693,
-                "scale": 2.024
+                "threshold": 7.739,
+                "scale": 1.791
             },
             "honest": {
-                "threshold": -50.745,
-                "scale": 2.892
+                "threshold": -51.025,
+                "scale": 2.702
             },
             "confident": {
-                "threshold": 33.04,
-                "scale": 2.294
+                "threshold": 32.99,
+                "scale": 2.192
             },
             "empathetic": {
-                "threshold": -35.341,
-                "scale": 2.102
+                "threshold": -35.367,
+                "scale": 2.104
             },
             "calm": {
-                "threshold": 49.334,
-                "scale": 3.094
+                "threshold": 49.459,
+                "scale": 2.827
             }
         },
         "openai/gpt-5.6-luna": {
             "factual": {
-                "threshold": -56.972,
-                "scale": 3.419
+                "threshold": -57.284,
+                "scale": 3.636
             },
             "serious": {
-                "threshold": 33.669,
-                "scale": 3.069
+                "threshold": 34.062,
+                "scale": 2.885
             },
             "casual": {
-                "threshold": -37.963,
-                "scale": 3.191
+                "threshold": -38.201,
+                "scale": 2.73
             },
             "creative": {
-                "threshold": 7.474,
-                "scale": 1.309
+                "threshold": 7.485,
+                "scale": 1.473
             },
             "honest": {
-                "threshold": -50.598,
-                "scale": 2.873
+                "threshold": -50.992,
+                "scale": 3.229
             },
             "confident": {
-                "threshold": 32.835,
-                "scale": 2.313
+                "threshold": 33.012,
+                "scale": 2.302
             },
             "empathetic": {
-                "threshold": -35.318,
-                "scale": 2.37
+                "threshold": -35.492,
+                "scale": 2.559
             },
             "calm": {
-                "threshold": 49.161,
-                "scale": 3.239
+                "threshold": 49.572,
+                "scale": 2.815
             }
         }
     }

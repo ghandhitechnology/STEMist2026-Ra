@@ -155,7 +155,10 @@ tanh unit>}}`). The env var also accepts a keyed form,
 selects a model table by the request's `model` field and falls back to
 `default`. The deployed tables were fit on 270 responses per model (142
 natural + 128 pole-elicited) for `anthropic/claude-sonnet-5` (also the
-default) and `openai/gpt-5.6-luna` on 2026-08-02, recorded in
+default) and `openai/gpt-5.6-luna` on 2026-08-02, re-rendered as
+multi-turn transcripts with `build_context_corpus.py` to match the
+conversation-window prompts rauchat sends (`MAX_SEQUENCE_TOKENS=6144`),
+and recorded in
 `gemma-evaluator/artifacts/recenter-deployed-2026-08-02.json`. Refit
 whenever a chat model or the system prompt changes materially. Known
 limit: the factual axis has no pole separation on either model's fluent
