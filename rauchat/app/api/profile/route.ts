@@ -15,14 +15,35 @@ import { withAuth, getWorkOS } from "@workos-inc/authkit-nextjs";
 import { z } from "zod";
 import { getProfile, saveProfile } from "@/lib/server/profile";
 import { getUserId, unauthorized } from "@/lib/server/auth";
+import {
+  isLocalFullAccessEnabled,
+  LOCAL_FULL_ACCESS_PROFILE,
+  LOCAL_FULL_ACCESS_USER,
+} from "@/lib/local-access";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const { user } = await withAuth();
-  if (!user) return unauthorized();
+  let user: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    profilePictureUrl: string | null;
+  };
 
-  const profile = await getProfile(user.id);
+  if (isLocalFullAccessEnabled()) {
+    user = LOCAL_FULL_ACCESS_USER;
+  } else {
+    const auth = await withAuth();
+    if (!auth.user) return unauthorized();
+    user = auth.user;
+  }
+
+  let profile = await getProfile(user.id);
+  if (!profile && isLocalFullAccessEnabled()) {
+    profile = await saveProfile(user.id, LOCAL_FULL_ACCESS_PROFILE);
+  }
   return NextResponse.json({
     profile,
     user: {
@@ -65,14 +86,16 @@ export async function PUT(req: NextRequest) {
 
   // Best-effort: keep the WorkOS user record's name in sync. Never fails the
   // request — the local profile is the source of truth for personalization.
-  try {
-    await getWorkOS().userManagement.updateUser({
-      userId,
-      firstName: parsed.data.firstName,
-      lastName: parsed.data.lastName,
-    });
-  } catch {
-    // Non-fatal.
+  if (!isLocalFullAccessEnabled()) {
+    try {
+      await getWorkOS().userManagement.updateUser({
+        userId,
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+      });
+    } catch {
+      // Non-fatal.
+    }
   }
 
   return NextResponse.json({ profile });

@@ -7,9 +7,17 @@
  */
 
 import { withAuth } from "@workos-inc/authkit-nextjs";
+import {
+  isLocalFullAccessEnabled,
+  LOCAL_FULL_ACCESS_USER,
+} from "@/lib/local-access";
 
 /** The signed-in WorkOS user id, or null when there is no session. */
 export async function getUserId(): Promise<string | null> {
+  if (isLocalFullAccessEnabled()) {
+    return LOCAL_FULL_ACCESS_USER.id;
+  }
+
   try {
     const { user } = await withAuth();
     return user?.id ?? null;

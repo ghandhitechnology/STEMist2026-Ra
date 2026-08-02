@@ -10,10 +10,16 @@
 
 import { getWorkOS, withAuth } from "@workos-inc/authkit-nextjs";
 import { redirectTo } from "@/lib/server/http";
+import { isLocalFullAccessEnabled } from "@/lib/local-access";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  // A local full-access session has no WorkOS state to revoke — go home.
+  if (isLocalFullAccessEnabled()) {
+    return redirectTo("/");
+  }
+
   try {
     const { sessionId } = await withAuth();
     if (sessionId) {
