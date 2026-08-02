@@ -105,6 +105,36 @@ function saveConversations(
   }
 }
 
+/**
+ * Merges the local cache with the server's copy, whole-conversation
+ * last-write-wins by `updatedAt`. Ties go to the SERVER copy: renames leave
+ * `updatedAt` alone by design (sidebar order), so an otherwise-unchanged
+ * local conversation must not clobber a rename that already synced.
+ * Local-only conversations are kept — they are the pre-server history that
+ * migrates up on the next flush.
+ */
+export function mergeConversations(
+  local: Conversation[],
+  remote: Conversation[]
+): Conversation[] {
+  const remoteById = new Map(remote.map((c) => [c.id, c]));
+  const merged: Conversation[] = [];
+  const seen = new Set<string>();
+  for (const conversation of local) {
+    const server = remoteById.get(conversation.id);
+    merged.push(
+      server && server.updatedAt >= conversation.updatedAt
+        ? server
+        : conversation
+    );
+    seen.add(conversation.id);
+  }
+  for (const conversation of remote) {
+    if (!seen.has(conversation.id)) merged.push(conversation);
+  }
+  return merged;
+}
+
 /** Drops every account's stored conversations (Settings -> clear data). */
 export function clearAllStoredConversations(): void {
   if (typeof window === "undefined") return;
@@ -283,6 +313,118 @@ export function useConversations(userId: string | null): UseConversations {
     };
   }, []);
 
+  // --- Server persistence ---------------------------------------------------
+  // localStorage stays the warm cache; /api/conversations is the cross-device
+  // source of truth. Dirtiness is tracked by object identity: every mutation
+  // of a conversation produces a new object via `updateConversations`, so a
+  // conversation is dirty exactly when its current reference differs from the
+  // one last confirmed on (or received from) the server.
+  const lastSyncedRef = useRef(new Map<string, Conversation>());
+  const inFlightRef = useRef(new Set<string>());
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncDirty = useCallback((keepalive = false) => {
+    if (!loadedFor.current) return;
+    for (const conversation of conversationsRef.current) {
+      // Untouched rows are session scratch space, same as for localStorage.
+      if (isUntouchedConversation(conversation)) continue;
+      if (lastSyncedRef.current.get(conversation.id) === conversation) continue;
+      // One request per conversation at a time — a response landing for an
+      // older snapshot after a newer one would mark stale state as synced.
+      if (inFlightRef.current.has(conversation.id)) continue;
+      const snapshot = conversation;
+      inFlightRef.current.add(snapshot.id);
+      fetch(`/api/conversations/${encodeURIComponent(snapshot.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(snapshot),
+        keepalive,
+      })
+        .then((res) => {
+          if (res.ok) lastSyncedRef.current.set(snapshot.id, snapshot);
+        })
+        .catch(() => {
+          // Offline or server down — still dirty, retried on the next flush.
+        })
+        .finally(() => {
+          inFlightRef.current.delete(snapshot.id);
+        });
+    }
+  }, []);
+
+  const syncDirtyRef = useRef(syncDirty);
+  syncDirtyRef.current = syncDirty;
+
+  /**
+   * Throttle, not debounce: the timer is NOT reset by further changes, so a
+   * streaming reply (which touches its conversation on every token) still
+   * flushes at most ~1.2s after the first unsynced change.
+   */
+  const scheduleFlush = useCallback(() => {
+    if (flushTimerRef.current) return;
+    flushTimerRef.current = setTimeout(() => {
+      flushTimerRef.current = null;
+      syncDirtyRef.current();
+    }, 1200);
+  }, []);
+
+  useEffect(() => {
+    if (!userId || loadedFor.current !== userId) return;
+    scheduleFlush();
+  }, [userId, conversations, scheduleFlush]);
+
+  // A tab closing mid-stream must not lose the turn: flush synchronously with
+  // keepalive so the requests outlive the page.
+  useEffect(() => {
+    const onPageHide = () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      syncDirtyRef.current(true);
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Pull the server's history once per account and merge it in. Server
+  // copies are recorded as synced by reference: wherever the merge kept the
+  // LOCAL object instead (newer here, or never uploaded), that conversation
+  // is left dirty and the scheduled flush migrates it up.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/conversations", {
+          headers: { accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { conversations?: unknown };
+        const remote = Array.isArray(data.conversations)
+          ? (data.conversations as Conversation[])
+          : [];
+        if (cancelled || loadedFor.current !== userId) return;
+        for (const conversation of remote) {
+          lastSyncedRef.current.set(conversation.id, conversation);
+        }
+        updateConversations((prev) => mergeConversations(prev, remote));
+        scheduleFlush();
+      } catch {
+        // Offline — the localStorage cache stands.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, updateConversations, scheduleFlush]);
+
   // Hydrate on mount and whenever the signed-in account changes.
   useEffect(() => {
     if (!userId) return;
@@ -309,6 +451,9 @@ export function useConversations(userId: string | null): UseConversations {
       leavingRef.current.clear();
       setEnteringIds([]);
       setLeavingIds([]);
+      // Sync bookkeeping belonged to the previous account too.
+      lastSyncedRef.current.clear();
+      inFlightRef.current.clear();
       updateConversations(() => stored);
       commitActiveId(null);
     }
@@ -401,6 +546,16 @@ export function useConversations(userId: string | null): UseConversations {
       setLeavingIds((prev) => prev.filter((x) => x !== id));
       updateConversations((prev) => prev.filter((c) => c.id !== id));
       if (activeIdRef.current === id) commitActiveId(null);
+      // Best-effort server delete. The `{}` JSON body exists only to satisfy
+      // the shared cross-site guard, which keys on Content-Type.
+      lastSyncedRef.current.delete(id);
+      if (loadedFor.current) {
+        fetch(`/api/conversations/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        }).catch(() => {});
+      }
     },
     [clearRowTimer, commitActiveId, updateConversations]
   );
