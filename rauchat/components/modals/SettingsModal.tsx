@@ -2,10 +2,9 @@
 
 /**
  * components/modals/SettingsModal.tsx
- * Sections: Model (inner model id, temperature), Memory (durable user memory),
- * Telemetry (Gemma endpoint status readout, poll interval), and Data
- * (clear local conversations).
- * Persists to localStorage under 'rauchat:settings'.
+ * Sections: Model (temperature), Memory (durable user memory), Telemetry
+ * (Gemma endpoint status readout, poll interval), and Data (clear local
+ * conversations). Persists to localStorage under 'rauchat:settings'.
  */
 
 import { useEffect, useState } from "react";
@@ -18,14 +17,12 @@ import styles from "./SettingsModal.module.css";
 const SETTINGS_STORAGE_KEY = "rauchat:settings";
 
 export type RauchatSettings = {
-  modelId: string;
   temperature: number;
   gemmaEndpoint: string;
   pollIntervalMs: number;
 };
 
 const DEFAULT_SETTINGS: RauchatSettings = {
-  modelId: "claude-sonnet-4-6",
   temperature: 0.7,
   gemmaEndpoint: "http://localhost:8008/v1/telemetry",
   pollIntervalMs: 1500,
@@ -173,20 +170,6 @@ export function SettingsModal({
     <Modal open={open} onClose={onClose} title="Settings">
       <section className={styles.section}>
         <h3 className={styles.sectionLabel}>Model</h3>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="rau-settings-model-id">
-            Inner model id
-          </label>
-          <input
-            id="rau-settings-model-id"
-            className={styles.input}
-            type="text"
-            value={settings.modelId}
-            spellCheck={false}
-            onChange={(event) => patch({ modelId: event.target.value })}
-            placeholder="claude-sonnet-4-6"
-          />
-        </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="rau-settings-temp">
             Temperature
