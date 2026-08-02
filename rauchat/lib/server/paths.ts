@@ -51,6 +51,43 @@ export function profilesDir(): string {
   return path.join(WORKSPACE_BASE_ROOT, "profiles");
 }
 
+/**
+ * Conversation ids are client-generated (crypto.randomUUID or a
+ * timestamp-random fallback) and become file names, so anything outside that
+ * alphabet is rejected outright — stripping could collide two distinct ids
+ * onto one file.
+ */
+export function sanitizeConversationId(conversationId: string): string {
+  const id = String(conversationId ?? "");
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
+    throw new WorkspacePathError("Invalid conversation id.");
+  }
+  return id;
+}
+
+/**
+ * Durable chat history, one JSON file per conversation. Lives beside
+ * `profiles/` and OUTSIDE the per-user sandbox so the file_read / file_write
+ * tools cannot touch transcripts.
+ */
+export function conversationsDirFor(userId: string): string {
+  return path.join(
+    WORKSPACE_BASE_ROOT,
+    "conversations",
+    sanitizeUserId(userId)
+  );
+}
+
+export function conversationFile(
+  userId: string,
+  conversationId: string
+): string {
+  return path.join(
+    conversationsDirFor(userId),
+    `${sanitizeConversationId(conversationId)}.json`
+  );
+}
+
 export function profileFile(userId: string): string {
   return path.join(profilesDir(), `${sanitizeUserId(userId)}.json`);
 }
