@@ -9,6 +9,12 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { getCanonicalAuthOrigin } from "@/lib/server/auth-config";
+import {
+  authConfigurationResponse,
+  authErrorResponse,
+  logAuthEvent,
+} from "@/lib/server/auth-errors";
 
 /**
  * A 302 with a RELATIVE Location.
@@ -21,6 +27,9 @@ import { NextResponse, type NextRequest } from "next/server";
  * no forwarded headers.
  */
 export function redirectTo(path: string): NextResponse {
+  if (!path.startsWith("/") || path.startsWith("//")) {
+    throw new TypeError("redirectTo only accepts an absolute application path.");
+  }
   return new NextResponse(null, { status: 302, headers: { Location: path } });
 }
 
@@ -29,38 +38,44 @@ export function redirectTo(path: string): NextResponse {
  * Returns a Response to send back, or null when the request is same-origin.
  */
 export function crossSiteRejection(req: NextRequest): Response | null {
-  const rejected = () =>
-    Response.json({ error: "Cross-site request rejected." }, { status: 403 });
+  const contentType = contentTypeRejection(req);
+  if (contentType) return contentType;
 
-  // Sec-Fetch-Site is set by the browser itself and cannot be forged by page
-  // script, so it is the authoritative signal whenever it is present.
-  const site = req.headers.get("sec-fetch-site");
-  if (site) {
-    return site === "same-origin" || site === "none"
-      ? contentTypeRejection(req)
-      : rejected();
+  let expectedOrigin: string;
+  try {
+    expectedOrigin = getCanonicalAuthOrigin(req);
+  } catch (error) {
+    return authConfigurationResponse("request-guard", error);
   }
 
-  // Fallback for clients that omit Sec-Fetch-Site. Compare HOSTS, not full
-  // origins: behind a TLS-terminating proxy (tailscale serve, Render, any
-  // load balancer) the browser's Origin is https:// while this server sees
-  // itself as http://, and a scheme comparison would reject every request.
+  const rejected = (reason: string) => {
+    logAuthEvent("request_rejected", { route: "request-guard", reason });
+    return authErrorResponse(
+      "AUTH_ORIGIN_MISMATCH",
+      "This authentication request came from an unexpected address. Reload Rauchat from its official URL and try again.",
+      403
+    );
+  };
+
+  const site = req.headers.get("sec-fetch-site")?.toLowerCase();
+  if (site === "cross-site") return rejected("fetch_metadata_cross_site");
+
   const origin = req.headers.get("origin");
   if (origin) {
-    let originHost: string;
+    let actualOrigin: string;
     try {
-      originHost = new URL(origin).host;
+      actualOrigin = new URL(origin).origin;
     } catch {
-      return rejected();
+      return rejected("invalid_origin_header");
     }
-    // Compare against the Host the browser addressed. X-Forwarded-* is NOT
-    // consulted: it is attacker-settable, and trusting it would let a forged
-    // request declare its own identity and match itself.
-    const selfHost = req.headers.get("host") ?? req.nextUrl.host;
-    if (originHost !== selfHost) return rejected();
+    if (actualOrigin !== expectedOrigin) {
+      return rejected("origin_does_not_match_canonical");
+    }
+  } else if (site === "same-site") {
+    return rejected("same_site_without_exact_origin");
   }
 
-  return contentTypeRejection(req);
+  return null;
 }
 
 /**
@@ -71,9 +86,10 @@ export function crossSiteRejection(req: NextRequest): Response | null {
 function contentTypeRejection(req: NextRequest): Response | null {
   const contentType = req.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().includes("application/json")) {
-    return Response.json(
-      { error: "Expected a JSON request body." },
-      { status: 415 }
+    return authErrorResponse(
+      "AUTH_CONTENT_TYPE_INVALID",
+      "Expected a JSON request body.",
+      415
     );
   }
   return null;

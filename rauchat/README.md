@@ -74,13 +74,19 @@ conversation that has grown since it was last named. Skills can be flagged
 
 ## Environment variables
 
-See `.env.example` for the full annotated list; everything is optional at
-boot (the app degrades gracefully when a variable is unset).
+See `.env.example` for the full annotated list. Model and telemetry services
+degrade gracefully when unset; WorkOS configuration is required whenever the
+local full-access development mode is not enabled.
 
 | Variable | Required for | Default |
 |---|---|---|
 | `OPENROUTER_API_KEY` | `/api/chat`, `/api/research`, `/api/title` | — (required to chat) |
-| `RAUCHAT_PUBLIC_URL` | OpenRouter attribution header | `http://localhost:3000` |
+| `RAUCHAT_PUBLIC_URL` | canonical auth origin + OpenRouter attribution | `http://localhost:3000` |
+| `WORKOS_API_KEY` | WorkOS server API calls | — |
+| `WORKOS_CLIENT_ID` | WorkOS application authentication | — |
+| `WORKOS_COOKIE_PASSWORD` | encrypted WorkOS session cookie (32+ chars) | — |
+| `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | exact registered OAuth callback | `http://localhost:3000/callback` |
+| `RAUCHAT_TRUST_PROXY` | opt-in forwarded host/protocol trust | `false` |
 | `GEMMA_ENDPOINT_URL` | Model Telemetry panel | unset → panel stays "disconnected" |
 | `GEMMA_API_KEY` | bearer auth to the Gemma endpoint | unset → no `Authorization` header |
 | `GEMMA_PROJECT_TIMEOUT_MS` | completed-response projection timeout | `60000` |
@@ -145,8 +151,35 @@ npm run dev                  # http://localhost:3000
 
 Production build:
 ```bash
-npm run build && npm start
+npm test && npm run build && npm start
 ```
+
+## WorkOS deployment checklist
+
+Rauchat uses one canonical browser origin. The sign-in pages and every
+`/api/auth/*` endpoint must be served from that same scheme, hostname, and
+port. Before deploying:
+
+1. Set `RAUCHAT_PUBLIC_URL=https://your-app.example` without a path and set
+   `NEXT_PUBLIC_WORKOS_REDIRECT_URI=https://your-app.example/callback`.
+2. Register that exact callback in the matching WorkOS environment and enable
+   Google and GitHub for the same application/client ID.
+3. Use API keys and client IDs from the same WorkOS staging or production
+   environment. Keep `WORKOS_COOKIE_PASSWORD` stable across every replica.
+4. Run Node.js 22.11 or newer, matching the installed AuthKit SDK requirement.
+5. Leave `RAUCHAT_TRUST_PROXY=false` unless the hosting proxy is documented to
+   overwrite, rather than append to, inbound `X-Forwarded-Host` and
+   `X-Forwarded-Proto` headers.
+6. Redirect alternate domains before serving the sign-in page. Never redirect
+   or replay credential POST requests between origins.
+7. Confirm the `wos-session`, OAuth state, and PKCE cookies are `HttpOnly`,
+   `SameSite=Lax`, path `/`, and `Secure` on HTTPS.
+8. Smoke-test password sign-in, signup + email verification, reset, Google,
+   GitHub, sign-out, and a deliberately mismatched Origin before launch.
+
+For local development, keep both public URLs on the same localhost port. A
+direct same-origin POST reaches WorkOS; a different hostname, scheme, or port
+is rejected with `AUTH_ORIGIN_MISMATCH` before credentials leave Rauchat.
 
 ## Known limitations
 

@@ -15,57 +15,26 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getWorkOS, saveSession } from "@workos-inc/authkit-nextjs";
 import { crossSiteRejection } from "@/lib/server/http";
+import { getAuthRuntimeConfig } from "@/lib/server/auth-config";
+import {
+  authConfigurationResponse,
+  authErrorResponse,
+  getWorkOSErrorDetails,
+  hasWorkOSIssue,
+  isEmailVerificationRequired,
+  isUnsupportedAuthChallenge,
+  isWorkOSUnavailable,
+  logAuthEvent,
+} from "@/lib/server/auth-errors";
 
 export const runtime = "nodejs";
 
 const SignUpSchema = z.object({
   email: z.email().max(320),
-  password: z.string().min(8).max(256),
+  password: z.string().min(10).max(256),
   firstName: z.string().trim().max(120).optional(),
   lastName: z.string().trim().max(120).optional(),
 });
-
-/** The subset of a WorkOS exception we actually read. */
-type WorkOSErrorLike = {
-  code?: string;
-  message?: string;
-  pendingAuthenticationToken?: string;
-  rawData?: { code?: string; pending_authentication_token?: string };
-};
-
-function asWorkOSError(err: unknown): WorkOSErrorLike {
-  return (err ?? {}) as WorkOSErrorLike;
-}
-
-/** Non-null when WorkOS wants an emailed code before issuing a session. */
-function pendingVerification(err: WorkOSErrorLike): string | null {
-  const code = err.code ?? err.rawData?.code;
-  if (code !== "email_verification_required") return null;
-  return (
-    err.pendingAuthenticationToken ??
-    err.rawData?.pending_authentication_token ??
-    null
-  );
-}
-
-function friendlyCreateError(err: WorkOSErrorLike): string {
-  const code = err.code ?? err.rawData?.code ?? "";
-  const message = (err.message ?? "").toLowerCase();
-  if (
-    code === "email_not_available" ||
-    message.includes("already exists") ||
-    message.includes("not available")
-  ) {
-    return "An account with that email already exists.";
-  }
-  if (code === "password_strength_error" || message.includes("password")) {
-    return "That password is too weak. Use at least 10 characters and avoid common words.";
-  }
-  if (code === "email_validation_error" || message.includes("email")) {
-    return "Enter a valid email address.";
-  }
-  return "Could not create your account. Try again.";
-}
 
 export async function POST(req: NextRequest) {
   const crossSite = crossSiteRejection(req);
@@ -75,20 +44,23 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    return authErrorResponse("INVALID_REQUEST", "Invalid JSON body.", 400);
   }
   const parsed = SignUpSchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json(
-      { error: "Enter a valid email and a password of at least 8 characters." },
-      { status: 400 }
+    return authErrorResponse(
+      "INVALID_REQUEST",
+      "Enter a valid email and a password of at least 10 characters.",
+      400
     );
   }
 
   const { email, password, firstName, lastName } = parsed.data;
-  const clientId = process.env.WORKOS_CLIENT_ID;
-  if (!clientId) {
-    return Response.json({ error: "Auth is not configured." }, { status: 500 });
+  let config;
+  try {
+    config = getAuthRuntimeConfig(req);
+  } catch (error) {
+    return authConfigurationResponse("sign-up", error);
   }
 
   const workos = getWorkOS();
@@ -101,37 +73,123 @@ export async function POST(req: NextRequest) {
       lastName: lastName || undefined,
     });
   } catch (err) {
-    return Response.json(
-      { error: friendlyCreateError(asWorkOSError(err)) },
-      { status: 400 }
+    const details = getWorkOSErrorDetails(err);
+    logAuthEvent("create_user_failed", { details, route: "sign-up" });
+    if (
+      hasWorkOSIssue(
+        details,
+        "email_already_exists",
+        "email_not_available",
+        "user_already_exists"
+      )
+    ) {
+      try {
+        const existing = await workos.userManagement.listUsers({
+          email,
+          limit: 1,
+        });
+        if (existing.data.length === 0) {
+          logAuthEvent("email_unavailable_without_user", {
+            details,
+            route: "sign-up",
+          });
+          return authErrorResponse(
+            "EMAIL_UNAVAILABLE",
+            "WorkOS rejected this email even though no matching account exists. Try another email or review the WorkOS email restrictions.",
+            400
+          );
+        }
+      } catch (lookupError) {
+        logAuthEvent("email_availability_lookup_failed", {
+          details: getWorkOSErrorDetails(lookupError),
+          route: "sign-up",
+        });
+      }
+      return authErrorResponse(
+        "EMAIL_ALREADY_REGISTERED",
+        "An account with that email already exists. Sign in instead.",
+        409
+      );
+    }
+    if (
+      hasWorkOSIssue(
+        details,
+        "password_strength_error",
+        "password_too_short",
+        "password_too_weak",
+        "password_validation_error"
+      )
+    ) {
+      return authErrorResponse(
+        "PASSWORD_TOO_WEAK",
+        "That password is too weak. Use at least 10 characters and avoid common words.",
+        400
+      );
+    }
+    if (
+      hasWorkOSIssue(
+        details,
+        "email_invalid",
+        "email_required",
+        "email_validation_error",
+        "invalid_email"
+      )
+    ) {
+      return authErrorResponse(
+        "INVALID_EMAIL",
+        "Enter a valid email address.",
+        400
+      );
+    }
+    if (isWorkOSUnavailable(details)) {
+      return authErrorResponse(
+        "AUTH_PROVIDER_UNAVAILABLE",
+        "The authentication service is temporarily unavailable. Try again.",
+        502
+      );
+    }
+    return authErrorResponse(
+      "SIGN_UP_FAILED",
+      "Could not create your account. Check your details and try again.",
+      400
     );
   }
 
   try {
     const authResponse = await workos.userManagement.authenticateWithPassword({
-      clientId,
+      clientId: config.clientId,
       email,
       password,
     });
-    await saveSession(authResponse, req);
+    await saveSession(authResponse, config.sessionUrl);
     return Response.json({ ok: true });
   } catch (err) {
-    const workosError = asWorkOSError(err);
-    const pendingAuthenticationToken = pendingVerification(workosError);
-    if (pendingAuthenticationToken) {
+    const details = getWorkOSErrorDetails(err);
+    if (isEmailVerificationRequired(details)) {
       return Response.json({
         ok: false,
         verify: true,
-        pendingAuthenticationToken,
+        code: "EMAIL_VERIFICATION_REQUIRED",
+        pendingAuthenticationToken: details.pendingAuthenticationToken,
         email,
       });
     }
-    return Response.json(
-      {
-        error:
-          "Your account was created, but signing in failed. Try signing in.",
-      },
-      { status: 400 }
+    if (isUnsupportedAuthChallenge(details)) {
+      logAuthEvent("unsupported_challenge", { details, route: "sign-up" });
+      return authErrorResponse(
+        "AUTH_CHALLENGE_UNSUPPORTED",
+        "Your account was created, but it requires an authentication step Rauchat does not support yet. Try Google or GitHub, or contact the administrator.",
+        409
+      );
+    }
+    logAuthEvent("post_signup_authentication_failed", {
+      details,
+      route: "sign-up",
+    });
+    return authErrorResponse(
+      "AUTH_PROVIDER_UNAVAILABLE",
+      "Your account was created, but the authentication service could not sign you in. Try signing in again.",
+      502
     );
   }
 }

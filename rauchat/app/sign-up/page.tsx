@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState, type FormEvent } from "react";
+import { authMessage } from "@/lib/auth-client";
 import styles from "../sign-in/auth.module.css";
 
 /** Seconds the resend button stays inert after a code is sent. */
@@ -59,7 +60,7 @@ export default function SignUpPage() {
         setBusy(false);
         return;
       }
-      setError(data?.error ?? "Could not create your account. Try again.");
+      setError(authMessage(data, "Could not create your account. Try again."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");
@@ -86,7 +87,7 @@ export default function SignUpPage() {
         window.location.href = "/";
         return;
       }
-      setError(data?.error ?? "That code is incorrect or has expired.");
+      setError(authMessage(data, "That code is incorrect or has expired."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");
@@ -122,7 +123,7 @@ export default function SignUpPage() {
         setBusy(false);
         return;
       }
-      setError(data?.error ?? "Could not send a new code. Try again.");
+      setError(authMessage(data, "Could not send a new code. Try again."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");
@@ -257,8 +258,8 @@ export default function SignUpPage() {
                     className={styles.input}
                     type="password"
                     autoComplete="new-password"
-                    placeholder="At least 8 characters"
-                    minLength={8}
+                    placeholder="At least 10 characters"
+                    minLength={10}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

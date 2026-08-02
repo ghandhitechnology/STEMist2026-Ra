@@ -31,6 +31,16 @@ export const LANGUAGE_OPTIONS = [
 const CONNECT_DIRTY_TITLE =
   "Save your profile changes before connecting a provider.";
 
+async function endSession(): Promise<void> {
+  const res = await fetch("/signout", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  window.location.href = "/sign-in";
+}
+
 export type AccountProfile = {
   firstName: string;
   lastName: string;
@@ -111,6 +121,7 @@ export function AccountModal({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   // Seed the form once per open (and again if the account arrives while the
   // modal is already up), so an abandoned edit never survives into the next
@@ -131,6 +142,7 @@ export function AccountModal({
     setConfirmingDelete(false);
     setDeleteConfirmText("");
     setDeleting(false);
+    setSigningOut(false);
   }, [open, account]);
 
   const dirty = useMemo(() => {
@@ -143,7 +155,7 @@ export function AccountModal({
     );
   }, [account, form]);
 
-  const busy = saving || deleting;
+  const busy = saving || deleting || signingOut;
   const canSave = Boolean(account) && dirty && !busy && form.nickname.trim().length > 0;
 
   // Deletion is irreversible, so it is never one click away from another
@@ -208,10 +220,22 @@ export function AccountModal({
     try {
       const res = await fetch("/api/account", { method: "DELETE" });
       if (!res.ok) throw new Error(String(res.status));
-      window.location.href = "/signout";
+      await endSession();
     } catch {
       setDeleting(false);
       setError("Could not delete the account. Try again.");
+    }
+  }
+
+  async function handleSignOut() {
+    if (busy) return;
+    setSigningOut(true);
+    setError(null);
+    try {
+      await endSession();
+    } catch {
+      setSigningOut(false);
+      setError("Could not sign out. Try again.");
     }
   }
 
@@ -400,11 +424,9 @@ export function AccountModal({
             type="button"
             className={`${styles.button} ${styles.buttonSecondary}`}
             disabled={busy}
-            onClick={() => {
-              window.location.href = "/signout";
-            }}
+            onClick={handleSignOut}
           >
-            Sign out
+            {signingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>
       </section>

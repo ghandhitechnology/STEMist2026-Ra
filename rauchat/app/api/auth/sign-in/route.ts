@@ -14,6 +14,16 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getWorkOS, saveSession } from "@workos-inc/authkit-nextjs";
 import { crossSiteRejection } from "@/lib/server/http";
+import { getAuthRuntimeConfig } from "@/lib/server/auth-config";
+import {
+  authConfigurationResponse,
+  authErrorResponse,
+  getWorkOSErrorDetails,
+  isEmailVerificationRequired,
+  isUnsupportedAuthChallenge,
+  isWorkOSUnavailable,
+  logAuthEvent,
+} from "@/lib/server/auth-errors";
 
 export const runtime = "nodejs";
 
@@ -21,29 +31,6 @@ const SignInSchema = z.object({
   email: z.email().max(320),
   password: z.string().min(1).max(256),
 });
-
-/** The subset of a WorkOS exception we actually read. */
-type WorkOSErrorLike = {
-  code?: string;
-  message?: string;
-  pendingAuthenticationToken?: string;
-  rawData?: { code?: string; pending_authentication_token?: string };
-};
-
-function asWorkOSError(err: unknown): WorkOSErrorLike {
-  return (err ?? {}) as WorkOSErrorLike;
-}
-
-/** Non-null when WorkOS wants an emailed code before issuing a session. */
-function pendingVerification(err: WorkOSErrorLike): string | null {
-  const code = err.code ?? err.rawData?.code;
-  if (code !== "email_verification_required") return null;
-  return (
-    err.pendingAuthenticationToken ??
-    err.rawData?.pending_authentication_token ??
-    null
-  );
-}
 
 export async function POST(req: NextRequest) {
   const crossSite = crossSiteRejection(req);
@@ -53,42 +40,63 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    return authErrorResponse("INVALID_REQUEST", "Invalid JSON body.", 400);
   }
   const parsed = SignInSchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json(
-      { error: "Enter your email and password." },
-      { status: 400 }
+    return authErrorResponse(
+      "INVALID_REQUEST",
+      "Enter your email and password.",
+      400
     );
   }
 
   const { email, password } = parsed.data;
-  const clientId = process.env.WORKOS_CLIENT_ID;
-  if (!clientId) {
-    return Response.json({ error: "Auth is not configured." }, { status: 500 });
+  let config;
+  try {
+    config = getAuthRuntimeConfig(req);
+  } catch (error) {
+    return authConfigurationResponse("sign-in", error);
   }
 
   try {
     const authResponse = await getWorkOS().userManagement.authenticateWithPassword(
-      { clientId, email, password }
+      { clientId: config.clientId, email, password }
     );
-    await saveSession(authResponse, req);
+    await saveSession(authResponse, config.sessionUrl);
     return Response.json({ ok: true });
   } catch (err) {
-    const workosError = asWorkOSError(err);
-    const pendingAuthenticationToken = pendingVerification(workosError);
-    if (pendingAuthenticationToken) {
+    const details = getWorkOSErrorDetails(err);
+    if (isEmailVerificationRequired(details)) {
       return Response.json({
         ok: false,
         verify: true,
-        pendingAuthenticationToken,
+        code: "EMAIL_VERIFICATION_REQUIRED",
+        pendingAuthenticationToken: details.pendingAuthenticationToken,
         email,
       });
     }
-    return Response.json(
-      { error: "Incorrect email or password." },
-      { status: 401 }
+    if (isUnsupportedAuthChallenge(details)) {
+      logAuthEvent("unsupported_challenge", { details, route: "sign-in" });
+      return authErrorResponse(
+        "AUTH_CHALLENGE_UNSUPPORTED",
+        "This account requires an authentication step Rauchat does not support yet. Try Google or GitHub, or contact the administrator.",
+        409
+      );
+    }
+    if (isWorkOSUnavailable(details)) {
+      logAuthEvent("provider_unavailable", { details, route: "sign-in" });
+      return authErrorResponse(
+        "AUTH_PROVIDER_UNAVAILABLE",
+        "The authentication service is temporarily unavailable. Try again.",
+        502
+      );
+    }
+    logAuthEvent("invalid_credentials", { details, route: "sign-in" });
+    return authErrorResponse(
+      "INVALID_CREDENTIALS",
+      "Incorrect email or password.",
+      401
     );
   }
 }
