@@ -11,7 +11,7 @@
  * lands at the end of the last text node without mutating the markdown.
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
@@ -243,22 +243,101 @@ const components: Components = {
   },
 };
 
+/* ------------------------------------------------------------------
+   Streaming word fade (§4.8)
+
+   While a turn streams, every word is wrapped in a span that fades in.
+   React reconciles the spans positionally, so words that already rendered
+   keep their DOM node — their animation has already played — and only
+   spans appended at the tail animate. When streaming ends the plain
+   component map takes over; the text is identical, so nothing shifts.
+   ------------------------------------------------------------------ */
+
+function splitFadeSpans(text: string): ReactNode[] {
+  return text.split(/(\s+)/).map((part, i) =>
+    part && !/^\s+$/.test(part) ? (
+      <span key={i} className={styles.fadeWord}>
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+}
+
+function fadeWords(children: ReactNode): ReactNode {
+  if (typeof children === "string") return splitFadeSpans(children);
+  if (Array.isArray(children)) {
+    return children.map((child, i) =>
+      typeof child === "string" ? (
+        <Fragment key={i}>{splitFadeSpans(child)}</Fragment>
+      ) : (
+        child
+      )
+    );
+  }
+  return children;
+}
+
+/** Elements whose direct text children fade in word-by-word. Code blocks
+ *  and inline code are deliberately excluded — tokenised code keeps its own
+ *  rendering, and fading fragments of code reads as flicker, not flow. */
+const FADE_TAGS = [
+  "p",
+  "li",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "strong",
+  "em",
+  "del",
+  "td",
+  "th",
+] as const;
+
+const streamingComponents: Components = {
+  ...components,
+  ...Object.fromEntries(
+    FADE_TAGS.map((Tag) => [
+      Tag,
+      // eslint-disable-next-line react/display-name
+      ({ node, children, ...rest }: { node?: unknown; children?: ReactNode }) => {
+        void node;
+        const Element = Tag as React.ElementType;
+        return <Element {...rest}>{fadeWords(children)}</Element>;
+      },
+    ])
+  ),
+};
+
 const REMARK_PLUGINS = [remarkGfm];
 
 export type MarkdownProps = {
   content: string;
   /** Extra class on the prose container (used for the streaming caret). */
   className?: string;
+  /** True while this turn is streaming — enables the word-by-word fade. */
+  streaming?: boolean;
 };
 
 /**
  * Memoised so a re-render of the surrounding turn does not re-parse markdown;
  * during streaming only the last message's `content` changes.
  */
-export const Markdown = memo(function Markdown({ content, className }: MarkdownProps) {
+export const Markdown = memo(function Markdown({
+  content,
+  className,
+  streaming = false,
+}: MarkdownProps) {
   return (
     <div className={className ? `${styles.prose} ${className}` : styles.prose}>
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
+      <ReactMarkdown
+        remarkPlugins={REMARK_PLUGINS}
+        components={streaming ? streamingComponents : components}
+      >
         {content}
       </ReactMarkdown>
     </div>

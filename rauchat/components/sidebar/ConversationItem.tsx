@@ -10,6 +10,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type AnimationEvent,
   type KeyboardEvent,
 } from "react";
 import type { Conversation } from "@/lib/types";
@@ -25,6 +26,12 @@ export type ConversationItemProps = {
   /** Auto-naming animation for this row: 'type' on first naming, 'retype' on regeneration. */
   titleAnimate?: "type" | "retype" | "none";
   onTitleAnimationEnd?: (id: string) => void;
+  /** True while the row pops in (freshly created conversation). */
+  isEntering?: boolean;
+  /** True while the row pops out; the store deletes it once it lands. */
+  isLeaving?: boolean;
+  /** Fires when a pop animation ends, so the store can settle the row. */
+  onRowAnimationEnd?: (id: string) => void;
   onSelect: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
@@ -36,6 +43,9 @@ export function ConversationItem({
   isStreaming = false,
   titleAnimate = "none",
   onTitleAnimationEnd,
+  isEntering = false,
+  isLeaving = false,
+  onRowAnimationEnd,
   onSelect,
   onRename,
   onDelete,
@@ -117,11 +127,30 @@ export function ConversationItem({
     );
   }
 
+  // A row on its way out never re-enters: the leave class wins.
+  const popClass = isLeaving
+    ? styles.rowLeaving
+    : isEntering
+      ? styles.rowEntering
+      : "";
+
+  // Both halves of a pop (size + fade) end here, and animations from the
+  // title caret bubble up — only the row's own settle the row.
+  function handleAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return;
+    if (!isEntering && !isLeaving) return;
+    onRowAnimationEnd?.(conversation.id);
+  }
+
   return (
     <div
       role="button"
       tabIndex={0}
-      className={`${styles.row} ${isActive ? styles.rowSelected : ""}`}
+      // A row playing its farewell is scenery: unfocusable, unreachable, and
+      // invisible to assistive tech for the ~190ms it still exists.
+      inert={isLeaving || undefined}
+      className={`${styles.row} ${isActive ? styles.rowSelected : ""} ${popClass}`}
+      onAnimationEnd={handleAnimationEnd}
       onClick={() => onSelect(conversation.id)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

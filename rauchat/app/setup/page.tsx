@@ -12,9 +12,16 @@
  * — the card shell stays on screen rather than a blank page. If /api/profile
  * has not answered within LOAD_TIMEOUT_MS the shell flips to a retryable
  * error instead of waiting forever.
+ *
+ * No state swap here is a hard cut. The card and its wordmark never unmount;
+ * the body inside is re-keyed per phase so setup.module.css can replay a
+ * zoom-and-fade on it, and its measured height is written back onto the
+ * wrapper so the card grows into the form instead of snapping. Submitting
+ * plays one exit frame before the navigation. All of it collapses to an
+ * instant swap under prefers-reduced-motion.
  */
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { IconChevronDown } from "@/components/modals/icons";
 import styles from "./setup.module.css";
 
@@ -40,7 +47,23 @@ const OTHER_VALUE = "__other__";
 /** How long we wait on GET /api/profile before offering "Try again". */
 const LOAD_TIMEOUT_MS = 8000;
 
+/** Length of .cardLeaving in setup.module.css — keep the two in step. */
+const EXIT_MS = 240;
+
 type LoadState = "loading" | "ready" | "redirecting" | "failed";
+
+/**
+ * Which body the card is showing. "loading" and "redirecting" render the same
+ * note, so they share a phase and do not blink between each other.
+ */
+function phaseOf(state: LoadState): "pending" | "ready" | "failed" {
+  return state === "ready" || state === "failed" ? state : "pending";
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 /** The lockup at the top of the card, shown in every state. */
 function Wordmark() {
@@ -67,7 +90,28 @@ export default function SetupPage() {
   const [languageChoice, setLanguageChoice] = useState<string>(LANGUAGE_OPTIONS[0].value);
   const [customLanguage, setCustomLanguage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * The card body is re-keyed per phase, so the height that .body animates to
+   * has to be measured from whichever body is live. A ref callback re-arms the
+   * observer on every swap; it also catches the "Other…" language input
+   * appearing, which changes the height without changing the phase.
+   */
+  const [bodyHeight, setBodyHeight] = useState<number | null>(null);
+  const bodyObserver = useRef<ResizeObserver | null>(null);
+  const measureBody = useCallback((node: HTMLDivElement | null) => {
+    bodyObserver.current?.disconnect();
+    bodyObserver.current = null;
+    if (!node) return;
+    setBodyHeight(node.offsetHeight);
+    if (typeof ResizeObserver === "undefined") return;
+    bodyObserver.current = new ResizeObserver(() => setBodyHeight(node.offsetHeight));
+    bodyObserver.current.observe(node);
+  }, []);
+
+  useEffect(() => () => bodyObserver.current?.disconnect(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,44 +197,41 @@ export default function SetupPage() {
       if (!res.ok) {
         throw new Error("Failed to save profile.");
       }
-      window.location.href = "/";
+      // One exit frame before the hard navigation, so leaving reads as
+      // intentional. `saving` stays true throughout — the form is done.
+      if (prefersReducedMotion()) {
+        window.location.href = "/";
+        return;
+      }
+      setLeaving(true);
+      window.setTimeout(() => {
+        window.location.href = "/";
+      }, EXIT_MS);
     } catch {
       setError("Couldn't save your profile. Try again.");
       setSaving(false);
     }
   }
 
-  if (loadState !== "ready") {
-    return (
-      <div className={styles.page} aria-busy={loadState === "failed" ? undefined : "true"}>
-        <div className={styles.card}>
-          <Wordmark />
-          {loadState === "failed" ? (
-            <div className={styles.status}>
-              <p className={styles.error} role="alert">
-                {loadError}
-              </p>
-              <button
-                type="button"
-                className={`${styles.submit} ${styles.retry}`}
-                onClick={handleRetry}
-              >
-                Try again
-              </button>
-            </div>
-          ) : (
-            <p className={styles.statusNote}>Preparing your workspace.</p>
-          )}
-        </div>
+  const phase = phaseOf(loadState);
+  let body: ReactNode;
+
+  if (phase === "failed") {
+    body = (
+      <div className={styles.status}>
+        <p className={styles.error} role="alert">
+          {loadError}
+        </p>
+        <button type="button" className={`${styles.submit} ${styles.retry}`} onClick={handleRetry}>
+          Try again
+        </button>
       </div>
     );
-  }
-
-  return (
-    <div className={styles.page}>
-      <div className={styles.card}>
-        <Wordmark />
-
+  } else if (phase === "pending") {
+    body = <p className={styles.statusNote}>Preparing your workspace.</p>;
+  } else {
+    body = (
+      <>
         <h1 className={styles.heading}>Welcome to Rauchat</h1>
         <p className={styles.subcopy}>
           The assistant personalizes replies with what you tell it here.
@@ -288,6 +329,23 @@ export default function SetupPage() {
             {saving ? "Saving…" : "Enter Rauchat"}
           </button>
         </form>
+      </>
+    );
+  }
+
+  return (
+    <div className={styles.page} aria-busy={phase === "pending" ? "true" : undefined}>
+      <div className={leaving ? `${styles.card} ${styles.cardLeaving}` : styles.card}>
+        <Wordmark />
+        <div
+          className={styles.body}
+          style={bodyHeight === null ? undefined : { height: bodyHeight }}
+        >
+          {/* Keyed so each phase replays the enter animation; ref measures it. */}
+          <div key={phase} ref={measureBody} className={styles.bodyInner}>
+            {body}
+          </div>
+        </div>
       </div>
     </div>
   );

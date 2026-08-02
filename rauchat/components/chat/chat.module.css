@@ -401,6 +401,22 @@
   background: var(--rau-accent);
   animation: caretBlink 1060ms steps(1, end) infinite;
 }
+/* §4.8 Streaming word fade — each word appended by the stream fades in.
+   Spans already on screen keep their DOM node across re-renders, so only
+   the tail animates. Duration sits above --rau-dur-base deliberately: the
+   fade overlaps the next few words arriving, which is what reads as flow. */
+.fadeWord {
+  animation: wordFadeIn 300ms var(--rau-ease-standard) both;
+}
+@keyframes wordFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes caretBlink {
   0%,
   49.99% {
@@ -1932,6 +1948,9 @@
   .thinkingSquare {
     animation: none;
     opacity: 1;
+  }
+  .fadeWord {
+    animation: none;
   }
   .chipRunning::after {
     animation: none;
