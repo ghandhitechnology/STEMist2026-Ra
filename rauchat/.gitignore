@@ -27,3 +27,8 @@ next-env.d.ts
 # Rauchat implementation-sources notes (untracked per request)
 sources.md
 .next-build/
+
+# Rauchat runtime state — per-user sandboxes, profiles, memories, skills.
+# Never commit user data; production keeps this on a persistent disk.
+workspace/
+.next-verify/
