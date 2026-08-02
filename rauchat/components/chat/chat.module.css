@@ -273,6 +273,13 @@
   padding: var(--rau-space-9) var(--rau-space-8) 0;
 }
 
+/* Grows the scroll range while a just-sent turn is anchored to the top of
+   the viewport (§4.8); sized imperatively by MessageList, 0 when idle. */
+.tailSpacer {
+  height: 0;
+  pointer-events: none;
+}
+
 /* Turn rhythm: 32px between turns (§3.4) */
 .turn {
   position: relative;
@@ -1210,9 +1217,13 @@
   line-height: var(--rau-lh-xs);
   font-weight: var(--rau-fw-semibold);
   letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-secondary);
 }
 .reasoningProse strong {
   color: var(--rau-text-secondary);
+}
+.reasoningProse > :first-child {
+  margin-top: 0;
 }
 .cardErrorBody {
   padding: var(--rau-space-4) var(--rau-space-5);

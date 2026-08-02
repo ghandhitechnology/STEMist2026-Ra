@@ -299,6 +299,9 @@ export const MessageItem = memo(function MessageItem({
             thinking={thinkingText}
             events={traceEvents}
             isStreaming={isStreaming}
+            latchKey={
+              isStreaming ? `${message.id}:${message.createdAt}` : undefined
+            }
             onRetry={onRetryToolEvent}
             onInstallSkill={onInstallSkill}
             onOpenDiagram={onOpenDiagram}

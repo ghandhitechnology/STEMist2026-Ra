@@ -129,8 +129,20 @@ export const ChatView = memo(function ChatView({
     thinking: streamThinking,
   } = streamingState;
 
-  // Stamp the in-flight turn once, when it starts.
-  if (isStreaming && !wasStreaming.current) turnStartedAt.current = Date.now();
+  // Stamp the in-flight turn once, when it starts. A turn starts with an
+  // empty buffer — isStreaming also flips true when the user navigates back
+  // to a conversation whose turn is still running (the streaming state is
+  // hidden elsewhere), and that must not restamp: the timestamp would jump
+  // and ThinkingSection's remount latch is keyed on it.
+  if (
+    isStreaming &&
+    !wasStreaming.current &&
+    content.length === 0 &&
+    streamThinking.length === 0 &&
+    toolEvents.length === 0
+  ) {
+    turnStartedAt.current = Date.now();
+  }
   wasStreaming.current = isStreaming;
 
   // Show the synthetic turn while streaming, and afterwards until the caller

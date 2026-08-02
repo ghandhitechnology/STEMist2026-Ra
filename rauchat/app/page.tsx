@@ -569,11 +569,22 @@ export default function Home() {
     (endExclusive: number) => {
       const conversation = store.activeConversation;
       if (!conversation) return;
-      const slice = conversation.messages.slice(0, endExclusive);
+      // A run in flight is not history yet: its user message has no reply
+      // (the reply lands in this conversation, never in the branch), so the
+      // branch cuts off before it. The partial assistant turn only lives in
+      // useChatStream state and is never copied.
+      let end = endExclusive;
+      if (chat.isStreaming && streamOwnerId === conversation.id) {
+        const last = conversation.messages.length - 1;
+        if (last >= 0 && conversation.messages[last].role === "user") {
+          end = Math.min(end, last);
+        }
+      }
+      const slice = conversation.messages.slice(0, end);
       const branch = store.createConversation(`${conversation.title} (branch)`);
       for (const m of slice) store.appendMessage(branch.id, m);
     },
-    [store]
+    [chat, store, streamOwnerId]
   );
 
   const handleBranchConversation = useCallback(() => {
