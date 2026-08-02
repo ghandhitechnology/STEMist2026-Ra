@@ -15,7 +15,7 @@
     "reasoningEffort": "medium"
   },
   "runtime": {
-    "scoreMethod": "2 * sigmoid(calibratorCoef * rawProjection + calibratorIntercept) - 1",
+    "scoreMethod": "tanh((rawProjection - decisionThreshold) / scoreScale)",
     "confidenceMethod": "absolute signed score",
     "responsePooling": "mean over assistant response tokens"
   },

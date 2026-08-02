@@ -33,8 +33,8 @@ class GemmaEvaluator:
         self.model: Any | None = None
         self.device: torch.device | None = None
         self.unit_vectors: torch.Tensor | None = None
-        self.calibrator_coef: torch.Tensor | None = None
-        self.calibrator_intercept: torch.Tensor | None = None
+        self.decision_threshold: torch.Tensor | None = None
+        self.score_scale: torch.Tensor | None = None
         self.status = "loading"
         self.detail = "waiting for model load"
         self._load_lock = threading.Lock()
@@ -67,13 +67,13 @@ class GemmaEvaluator:
                 self.model = model
                 self.device = device
                 self.unit_vectors = self.bundle.unit_vectors.float().to(device)
-                self.calibrator_coef = torch.tensor(
-                    [axis.calibrator_coef for axis in self.bundle.axes],
+                self.decision_threshold = torch.tensor(
+                    [axis.decision_threshold for axis in self.bundle.axes],
                     dtype=torch.float32,
                     device=device,
                 )
-                self.calibrator_intercept = torch.tensor(
-                    [axis.calibrator_intercept for axis in self.bundle.axes],
+                self.score_scale = torch.tensor(
+                    [axis.score_scale for axis in self.bundle.axes],
                     dtype=torch.float32,
                     device=device,
                 )
@@ -90,8 +90,8 @@ class GemmaEvaluator:
             raise RuntimeError("Evaluator is not ready.")
         if self.device is None or self.unit_vectors is None:
             raise RuntimeError("Evaluator tensors are not initialized.")
-        if self.calibrator_coef is None or self.calibrator_intercept is None:
-            raise RuntimeError("Evaluator calibrators are not initialized.")
+        if self.decision_threshold is None or self.score_scale is None:
+            raise RuntimeError("Evaluator score scaling is not initialized.")
 
         started = time.perf_counter()
         full_ids, response_start, response_end, truncated = self._render_ids(
@@ -118,10 +118,9 @@ class GemmaEvaluator:
             raise RuntimeError("Model hidden size does not match vector artifacts.")
 
         raw_scores = torch.mv(self.unit_vectors, activation)
-        probabilities = torch.sigmoid(
-            self.calibrator_coef * raw_scores + self.calibrator_intercept
+        signed_scores = torch.tanh(
+            (raw_scores - self.decision_threshold) / self.score_scale
         )
-        signed_scores = probabilities.mul(2).sub(1).clamp(-1, 1)
         readings = [
             {
                 "traitId": axis.trait_id,
@@ -131,7 +130,7 @@ class GemmaEvaluator:
             for axis, score in zip(self.bundle.axes, signed_scores, strict=True)
         ]
 
-        del outputs, hidden_states, activation, raw_scores, probabilities, signed_scores
+        del outputs, hidden_states, activation, raw_scores, signed_scores
         gc.collect()
         return {
             "readings": readings,

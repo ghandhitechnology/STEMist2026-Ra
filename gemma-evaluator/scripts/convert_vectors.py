@@ -295,7 +295,7 @@ def convert(source: Path, metrics_path: Path, output: Path) -> None:
             "reasoningEffort": common["judge_reasoning_effort"],
         },
         "runtime": {
-            "scoreMethod": "2 * sigmoid(calibratorCoef * rawProjection + calibratorIntercept) - 1",
+            "scoreMethod": "tanh((rawProjection - decisionThreshold) / scoreScale)",
             "confidenceMethod": "absolute signed score",
             "responsePooling": "mean over assistant response tokens",
         },

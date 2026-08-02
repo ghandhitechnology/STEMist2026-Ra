@@ -16,8 +16,8 @@ class AxisMetadata:
     trait_id: str
     positive_label: str
     negative_label: str
-    calibrator_coef: float
-    calibrator_intercept: float
+    decision_threshold: float
+    score_scale: float
 
 
 @dataclass(frozen=True)
@@ -83,13 +83,15 @@ class ArtifactBundle:
                 trait_id=str(axis["traitId"]),
                 positive_label=str(axis["positiveLabel"]),
                 negative_label=str(axis["negativeLabel"]),
-                calibrator_coef=float(axis["calibratorCoef"]),
-                calibrator_intercept=float(axis["calibratorIntercept"]),
+                decision_threshold=float(axis["decisionThreshold"]),
+                score_scale=float(axis["scoreScale"]),
             )
             for axis in raw_axes
         )
         if len({axis.trait_id for axis in axes}) != projection_rank:
             raise RuntimeError("Vector metadata contains duplicate trait IDs.")
+        if any(axis.score_scale <= 0.0 for axis in axes):
+            raise RuntimeError("Vector metadata contains a non-positive score scale.")
         return cls(metadata=metadata, axes=axes, unit_vectors=unit_vectors)
 
 
