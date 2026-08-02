@@ -15,6 +15,7 @@ import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react"
 import type { ToolEvent, ToolName } from "@/lib/types";
 import styles from "./chat.module.css";
 import {
+  IconBrowser,
   IconDiagram,
   IconChevronDown,
   IconDownload,
@@ -146,6 +147,7 @@ const TOOL_META: Record<ToolName, ToolMeta> = {
   // the card body below renders that same sentence via `detail` — hideArg
   // keeps it from printing twice in the collapsed header.
   memory_add: { label: "Memory", Icon: IconMemory, hideArg: true },
+  browser_use: { label: "Browser", Icon: IconBrowser, quoteArg: true, keepExpanded: true },
 };
 
 const TOOL_VERBS: Record<ToolName, string> = {
@@ -157,6 +159,7 @@ const TOOL_VERBS: Record<ToolName, string> = {
   skill_make: "Authoring skill",
   diagram: "Building diagram",
   memory_add: "Saving to memory",
+  browser_use: "Using the browser",
 };
 
 /** Present-tense verb for the thinking indicator (§4.8). */
@@ -561,7 +564,48 @@ const BODIES: Record<ToolName, (p: BodyProps) => React.JSX.Element> = {
   memory_add: ({ event }) => (
     <EmptyLine>{event.detail ?? "Saved to memory."}</EmptyLine>
   ),
+  browser_use: BrowserUseBody,
 };
+
+function BrowserUseBody({ event }: BodyProps) {
+  if (event.status === "running") return <Shimmer rows={2} />;
+  const rec = asRec(event.result);
+  const status = asStr(rec?.status) ?? event.detail ?? "done";
+  const liveViewUrl = asStr(rec?.liveViewUrl);
+  const sessionId = asStr(rec?.sessionId);
+  const result = rec?.result;
+  const summary =
+    typeof result === "string"
+      ? result
+      : result
+        ? JSON.stringify(result, null, 2)
+        : null;
+
+  return (
+    <div>
+      <EmptyLine>
+        {status}
+        {sessionId ? ` · ${sessionId}` : ""}
+      </EmptyLine>
+      {liveViewUrl ? (
+        <a
+          className={styles.downloadLink}
+          href={liveViewUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open session
+          <IconExternal size={12} />
+        </a>
+      ) : null}
+      {summary ? (
+        <pre className={styles.fileLines}>
+          <code>{summary.slice(0, 4000)}</code>
+        </pre>
+      ) : null}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------
    Card

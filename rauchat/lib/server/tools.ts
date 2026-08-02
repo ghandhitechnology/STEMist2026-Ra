@@ -10,6 +10,7 @@ import { writeFile } from "node:fs/promises";
 import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import type { SkillDraft, ToolName } from "@/lib/types";
+import { browserUse } from "./browserbase";
 import { writeDiagram } from "./diagrams";
 import { appendMemory } from "./memory";
 import {
@@ -409,6 +410,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
               "skill_make",
               "diagram",
               "memory_add",
+              "browser_use",
             ],
           },
           description: "Tool capabilities this skill needs when active.",
@@ -474,6 +476,27 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
       required: ["content"],
     },
   },
+  {
+    name: "browser_use",
+    description:
+      "Control a real cloud browser (Browserbase) to complete a web task: open pages, click, fill forms, extract information, and report what you found. Use for interactive sites, dashboards, or multi-step browsing that plain web_search cannot do. Provide a clear task; optionally include a start URL.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task: {
+          type: "string",
+          description:
+            "Natural-language description of what to do in the browser, including success criteria.",
+        },
+        startUrl: {
+          type: "string",
+          description:
+            "Optional URL to open first before carrying out the task.",
+        },
+      },
+      required: ["task"],
+    },
+  },
 ];
 
 /**
@@ -515,6 +538,8 @@ export function toolEventTitle(
       return String(input.title ?? input.id ?? "diagram");
     case "memory_add":
       return `"${truncate(String(input.content ?? ""), 72)}"`;
+    case "browser_use":
+      return `"${truncate(String(input.task ?? ""), 72)}"`;
     default:
       return "";
   }
@@ -578,6 +603,7 @@ export async function executeTool(
         "skill_make",
         "diagram",
         "memory_add",
+        "browser_use",
       ]);
       const capabilityTools = Array.isArray(input.tools)
         ? input.tools.filter(
@@ -624,6 +650,18 @@ export async function executeTool(
       const content = String(input.content ?? "");
       const saved = await memoryAdd(userId, content);
       return { result: saved, detail: truncate(content, 96) };
+    }
+    case "browser_use": {
+      const task = String(input.task ?? "");
+      const startUrl =
+        input.startUrl === undefined ? undefined : String(input.startUrl);
+      const outcome = await browserUse(task, { startUrl });
+      return {
+        result: outcome,
+        detail: outcome.sessionId
+          ? `session ${outcome.sessionId}`
+          : outcome.status.toLowerCase(),
+      };
     }
     default:
       throw new Error(`Unknown tool: ${tool}`);

@@ -57,7 +57,8 @@ export type ToolName =
   | "file_write"
   | "skill_make"
   | "diagram"
-  | "memory_add";
+  | "memory_add"
+  | "browser_use";
 
 /**
  * How a diagram is rendered. `html`/`react`/`svg` run in a sandboxed

@@ -24,6 +24,7 @@ import styles from "./chat.module.css";
 import {
   IconArrowUp,
   IconAttach,
+  IconBrowser,
   IconCheck,
   IconFileRead,
   IconFileWrite,
@@ -56,6 +57,7 @@ const TOOL_CHIPS: Array<{
   { tool: "file_read", label: "Read file", Icon: IconFileRead },
   { tool: "file_write", label: "Write file", Icon: IconFileWrite },
   { tool: "skill_make", label: "Skill maker", Icon: IconSkill },
+  { tool: "browser_use", label: "Browser", Icon: IconBrowser },
 ];
 
 export type ComposerSubmission = {

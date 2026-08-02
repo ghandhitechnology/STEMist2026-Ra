@@ -82,6 +82,7 @@ const ToolNameSchema = z.enum([
   "skill_make",
   "diagram",
   "memory_add",
+  "browser_use",
 ]);
 
 const AttachmentSchema = z.object({

@@ -144,6 +144,32 @@ export default function Home() {
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [unavailableTools, setUnavailableTools] = useState<
+    Partial<Record<ToolName, string>>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/models")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { tools?: { browser_use?: boolean } } | null) => {
+        if (cancelled || !data) return;
+        setUnavailableTools(
+          data.tools?.browser_use
+            ? {}
+            : {
+                browser_use:
+                  "Set BROWSERBASE_API_KEY in your machine environment and restart Rauchat.",
+              }
+        );
+      })
+      .catch(() => {
+        /* leave tools available; server will error clearly if misconfigured */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // "/auto" mode: every tool is loaded each turn and the agent decides when
   // to use them. Persisted so it survives reloads.
@@ -720,6 +746,7 @@ export default function Home() {
         onToggleTelemetry={toggleTelemetry}
         onBranchConversation={handleBranchConversation}
         defaultTools={DEFAULT_TOOLS}
+        unavailableTools={unavailableTools}
         autoTools={autoTools}
         onToggleAutoTools={toggleAutoTools}
         skills={skills}

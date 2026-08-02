@@ -92,6 +92,8 @@ local full-access development mode is not enabled.
 | `GEMMA_API_KEY` | bearer auth to the Gemma endpoint | unset → no `Authorization` header |
 | `GEMMA_PROJECT_TIMEOUT_MS` | completed-response projection timeout | `60000` |
 | `TAVILY_API_KEY` | higher-quality `web_search` | unset → falls back to scraping DuckDuckGo HTML |
+| `BROWSERBASE_API_KEY` | `browser_use` cloud browser tool | unset → tool unavailable |
+| `BROWSERBASE_PROJECT_ID` | Browserbase project (optional) | — |
 | `RAUCHAT_WORKSPACE` | sandbox root for files/PDFs/skills | `./workspace` |
 
 ## Gemma 4 12B remote endpoint contract

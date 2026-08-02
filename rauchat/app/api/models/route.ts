@@ -9,6 +9,7 @@
 
 import { MODELS } from "@/lib/models";
 import { getUserId, unauthorized } from "@/lib/server/auth";
+import { browserUseConfigured } from "@/lib/server/browserbase";
 
 export const runtime = "nodejs";
 
@@ -46,5 +47,8 @@ export async function GET() {
   return Response.json({
     models,
     configured: Boolean(process.env.OPENROUTER_API_KEY),
+    tools: {
+      browser_use: browserUseConfigured(),
+    },
   });
 }

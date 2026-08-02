@@ -172,6 +172,15 @@ export const IconMore = (p: IconProps) => (
   </Svg>
 );
 
+export const IconBrowser = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2" y="2.75" width="12" height="10.5" rx="1.5" />
+    <path d="M2 5.75h12" />
+    <circle cx="4" cy="4.25" r="0.6" fill="currentColor" stroke="none" />
+    <circle cx="5.75" cy="4.25" r="0.6" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
 export const IconAttach = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12.75 7.5 8 12.25a3 3 0 0 1-4.25-4.25l5-5a2 2 0 0 1 2.83 2.83l-5 5a1 1 0 0 1-1.42-1.42L9.5 5.25" />
