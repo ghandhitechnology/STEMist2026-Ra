@@ -45,3 +45,15 @@ Originally, the app used sigmoid functions for data scaling. However, the sigmoi
 ## What's Next for RauChat
 
 RauChat is already a full product, but the product is unsustainable due to high GPU and API costs. Now that a user-specific authentication service is available, launching a free trial for a limited number of beta testers to expand this more transparent, interpretable service to more users, then rolling out a generous subscription service for maintenance, will be the next step RauChat takes.
+
+
+
+## Past 3 days 
+### Day 1: 
+- Initial app dev
+- Inifial vector extraction run
+
+### Day2 : 
+- app dev improvements, gemma integration, deployment 
+- vector calibration for each model
+- polished app experience for it to be usable 
