@@ -29,3 +29,6 @@ Thumbs.db
 
 # Raw Gemma/Colab exports (large, pickle-based research artifacts)
 gemma-results/
+
+# Local calibration analysis and operational notes
+CALIBRATION_REPORT.md

@@ -68,6 +68,40 @@
                 "scale": 2.827
             }
         },
+        "anthropic/claude-opus-5": {
+            "factual": {
+                "threshold": -57.446,
+                "scale": 5.348
+            },
+            "serious": {
+                "threshold": 33.57,
+                "scale": 3.027
+            },
+            "casual": {
+                "threshold": -37.729,
+                "scale": 2.851
+            },
+            "creative": {
+                "threshold": 8.03,
+                "scale": 1.994
+            },
+            "honest": {
+                "threshold": -50.867,
+                "scale": 7.734
+            },
+            "confident": {
+                "threshold": 32.855,
+                "scale": 2.41
+            },
+            "empathetic": {
+                "threshold": -35.509,
+                "scale": 2.27
+            },
+            "calm": {
+                "threshold": 49.666,
+                "scale": 3.379
+            }
+        },
         "openai/gpt-5.6-luna": {
             "factual": {
                 "threshold": -57.284,
@@ -100,6 +134,108 @@
             "calm": {
                 "threshold": 49.572,
                 "scale": 2.815
+            }
+        },
+        "openai/gpt-5.6-sol": {
+            "factual": {
+                "threshold": -57.806,
+                "scale": 5.303
+            },
+            "serious": {
+                "threshold": 34.414,
+                "scale": 2.947
+            },
+            "casual": {
+                "threshold": -38.55,
+                "scale": 3.042
+            },
+            "creative": {
+                "threshold": 7.491,
+                "scale": 1.475
+            },
+            "honest": {
+                "threshold": -51.379,
+                "scale": 4.473
+            },
+            "confident": {
+                "threshold": 33.348,
+                "scale": 6.324
+            },
+            "empathetic": {
+                "threshold": -35.867,
+                "scale": 2.629
+            },
+            "calm": {
+                "threshold": 50.18,
+                "scale": 2.854
+            }
+        },
+        "openai/gpt-5.6-terra": {
+            "factual": {
+                "threshold": -57.041,
+                "scale": 3.723
+            },
+            "serious": {
+                "threshold": 33.911,
+                "scale": 2.406
+            },
+            "casual": {
+                "threshold": -37.984,
+                "scale": 2.796
+            },
+            "creative": {
+                "threshold": 7.556,
+                "scale": 1.478
+            },
+            "honest": {
+                "threshold": -50.723,
+                "scale": 4.969
+            },
+            "confident": {
+                "threshold": 33.093,
+                "scale": 2.29
+            },
+            "empathetic": {
+                "threshold": -35.245,
+                "scale": 2.602
+            },
+            "calm": {
+                "threshold": 49.584,
+                "scale": 3.015
+            }
+        },
+        "x-ai/grok-4.5": {
+            "factual": {
+                "threshold": -60.248,
+                "scale": 7.966
+            },
+            "serious": {
+                "threshold": 35.231,
+                "scale": 4.678
+            },
+            "casual": {
+                "threshold": -39.628,
+                "scale": 5.08
+            },
+            "creative": {
+                "threshold": 8.241,
+                "scale": 3.183
+            },
+            "honest": {
+                "threshold": -53.093,
+                "scale": 7.238
+            },
+            "confident": {
+                "threshold": 34.293,
+                "scale": 4.327
+            },
+            "empathetic": {
+                "threshold": -37.081,
+                "scale": 4.504
+            },
+            "calm": {
+                "threshold": 51.118,
+                "scale": 6.924
             }
         }
     }

@@ -60,8 +60,8 @@ Skills library expose the same sandbox and skill set through the UI.
 ## Models & thinking levels
 
 All generation goes through OpenRouter with one key. The catalog
-(`lib/models.ts`): Claude Sonnet 5 / Opus 5 / Fable 5 (thinking
-off/low/medium/high) and GPT-5.6 Sol / Luna / Terra (minimal→high, Terra
+(`lib/models.ts`): Claude Sonnet 5 / Opus 5 and Grok 4.5 (thinking
+off/low/medium/high), plus GPT-5.6 Sol / Luna / Terra (minimal→high, Terra
 adds xhigh). The selector next to the chat title switches model and
 thinking per conversation; levels map to OpenRouter's unified
 `reasoning: { effort }` parameter (`lib/server/openrouter.ts`).

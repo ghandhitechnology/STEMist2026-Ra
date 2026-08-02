@@ -52,11 +52,12 @@ export type ModelSelectorProps = {
   disabled?: boolean;
 };
 
-const FAMILY_ORDER: ModelFamily[] = ["anthropic", "openai"];
+const FAMILY_ORDER: ModelFamily[] = ["anthropic", "openai", "xai"];
 
 const FAMILY_LABEL: Record<ModelFamily, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
+  xai: "xAI",
 };
 
 const THINKING_LABEL: Record<ThinkingLevel, string> = {

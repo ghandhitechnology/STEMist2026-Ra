@@ -12,7 +12,7 @@
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
-export type ModelFamily = "openai" | "anthropic";
+export type ModelFamily = "openai" | "anthropic" | "xai";
 
 export type ModelInfo = {
   /** Rauchat-local id, stored on conversations. */
@@ -53,16 +53,6 @@ export const MODELS: ModelInfo[] = [
     defaultThinking: "medium",
   },
   {
-    id: "claude-fable-5",
-    openrouterId: "anthropic/claude-fable-5",
-    label: "Claude Fable 5",
-    shortLabel: "Fable 5",
-    family: "anthropic",
-    description: "Anthropic's frontier Mythos-class model.",
-    thinkingLevels: ["off", "low", "medium", "high"],
-    defaultThinking: "medium",
-  },
-  {
     id: "gpt-5.6-sol",
     openrouterId: "openai/gpt-5.6-sol",
     label: "GPT-5.6 Sol",
@@ -90,6 +80,16 @@ export const MODELS: ModelInfo[] = [
     family: "openai",
     description: "Long-horizon reasoning specialist.",
     thinkingLevels: ["minimal", "low", "medium", "high", "xhigh"],
+    defaultThinking: "medium",
+  },
+  {
+    id: "grok-4.5",
+    openrouterId: "x-ai/grok-4.5",
+    label: "Grok 4.5",
+    shortLabel: "Grok 4.5",
+    family: "xai",
+    description: "xAI's frontier reasoning model.",
+    thinkingLevels: ["off", "low", "medium", "high"],
     defaultThinking: "medium",
   },
 ];
