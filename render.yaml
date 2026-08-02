@@ -1,0 +1,53 @@
+# Render Blueprint — deploys the Rauchat Next.js app with a persistent disk.
+#
+# The disk is mounted at /var/data and RAUCHAT_WORKSPACE points inside it, so
+# per-user sandboxes, profiles, memories, and skills survive deploys and
+# restarts. Persistent disks require the Starter plan and pin the service to
+# a single instance (no zero-downtime deploys) — both acceptable here since
+# all state is filesystem-local anyway.
+#
+# Secrets marked `sync: false` are entered once in the Render dashboard when
+# the Blueprint is first created; they never live in this file.
+services:
+  - type: web
+    name: rauchat
+    runtime: node
+    rootDir: rauchat
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: rauchat-workspace
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22.16.0"
+      - key: RAUCHAT_WORKSPACE
+        value: /var/data/workspace
+      # Required at runtime — chat, research, and titling all go through
+      # OpenRouter.
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # WorkOS AuthKit. The cookie password must be >= 32 chars
+      # (openssl rand -hex 32).
+      - key: WORKOS_API_KEY
+        sync: false
+      - key: WORKOS_CLIENT_ID
+        sync: false
+      - key: WORKOS_COOKIE_PASSWORD
+        sync: false
+      # Browser-visible origin, e.g. https://rauchat.onrender.com — no path.
+      - key: RAUCHAT_PUBLIC_URL
+        sync: false
+      # Must be RAUCHAT_PUBLIC_URL + /callback, and registered in the WorkOS
+      # dashboard under Redirects. NEXT_PUBLIC_* is inlined at build time, so
+      # changing it requires a redeploy.
+      - key: NEXT_PUBLIC_WORKOS_REDIRECT_URI
+        sync: false
+      # Optional integrations (web search, telemetry, cloud browser) are left
+      # out of the Blueprint on purpose — add TAVILY_API_KEY,
+      # GEMMA_ENDPOINT_URL / GEMMA_API_KEY, and BROWSERBASE_API_KEY /
+      # BROWSERBASE_PROJECT_ID in the dashboard whenever they're wanted. The
+      # app degrades gracefully without them.

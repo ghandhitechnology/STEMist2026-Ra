@@ -26,6 +26,7 @@ const PUBLIC_PATHS = new Set([
   "/reset-password",
   "/callback",
   "/signout",
+  "/api/health",
 ]);
 
 function isPublicPath(pathname: string): boolean {
