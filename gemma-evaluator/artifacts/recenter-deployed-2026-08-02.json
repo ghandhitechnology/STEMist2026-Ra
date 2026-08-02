@@ -1,0 +1,106 @@
+{
+    "default": {
+        "factual": {
+            "threshold": -56.938,
+            "scale": 3.092
+        },
+        "serious": {
+            "threshold": 33.748,
+            "scale": 4.261
+        },
+        "casual": {
+            "threshold": -37.859,
+            "scale": 3.308
+        },
+        "creative": {
+            "threshold": 7.693,
+            "scale": 2.024
+        },
+        "honest": {
+            "threshold": -50.745,
+            "scale": 2.892
+        },
+        "confident": {
+            "threshold": 33.04,
+            "scale": 2.294
+        },
+        "empathetic": {
+            "threshold": -35.341,
+            "scale": 2.102
+        },
+        "calm": {
+            "threshold": 49.334,
+            "scale": 3.094
+        }
+    },
+    "models": {
+        "anthropic/claude-sonnet-5": {
+            "factual": {
+                "threshold": -56.938,
+                "scale": 3.092
+            },
+            "serious": {
+                "threshold": 33.748,
+                "scale": 4.261
+            },
+            "casual": {
+                "threshold": -37.859,
+                "scale": 3.308
+            },
+            "creative": {
+                "threshold": 7.693,
+                "scale": 2.024
+            },
+            "honest": {
+                "threshold": -50.745,
+                "scale": 2.892
+            },
+            "confident": {
+                "threshold": 33.04,
+                "scale": 2.294
+            },
+            "empathetic": {
+                "threshold": -35.341,
+                "scale": 2.102
+            },
+            "calm": {
+                "threshold": 49.334,
+                "scale": 3.094
+            }
+        },
+        "openai/gpt-5.6-luna": {
+            "factual": {
+                "threshold": -56.972,
+                "scale": 3.419
+            },
+            "serious": {
+                "threshold": 33.669,
+                "scale": 3.069
+            },
+            "casual": {
+                "threshold": -37.963,
+                "scale": 3.191
+            },
+            "creative": {
+                "threshold": 7.474,
+                "scale": 1.309
+            },
+            "honest": {
+                "threshold": -50.598,
+                "scale": 2.873
+            },
+            "confident": {
+                "threshold": 32.835,
+                "scale": 2.313
+            },
+            "empathetic": {
+                "threshold": -35.318,
+                "scale": 2.37
+            },
+            "calm": {
+                "threshold": 49.161,
+                "scale": 3.239
+            }
+        }
+    }
+}

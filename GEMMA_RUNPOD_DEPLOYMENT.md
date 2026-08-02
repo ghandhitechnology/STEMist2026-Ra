@@ -150,7 +150,13 @@ The artifact thresholds were calibrated on Gemma-generated extremes; live
 traffic is Claude text, which sits offset on every axis. The Pod env var
 `TRAIT_RECENTER_JSON` overrides `decisionThreshold`/`scoreScale` per trait
 (`{"traitId": {"threshold": <median natural raw>, "scale": <raw units per
-tanh unit>}}`). The values currently deployed were fit on 72 natural + 64
-pole-elicited Claude Sonnet responses on 2026-08-02 and are recorded in
-`gemma-evaluator/artifacts/recenter-claude-sonnet-2026-08-02.json`. Refit
-whenever the chat model or system prompt changes materially.
+tanh unit>}}`). The env var also accepts a keyed form,
+`{"default": <table>, "models": {"<openrouterId>": <table>}}` — `/project`
+selects a model table by the request's `model` field and falls back to
+`default`. The deployed tables were fit on 270 responses per model (142
+natural + 128 pole-elicited) for `anthropic/claude-sonnet-5` (also the
+default) and `openai/gpt-5.6-luna` on 2026-08-02, recorded in
+`gemma-evaluator/artifacts/recenter-deployed-2026-08-02.json`. Refit
+whenever a chat model or the system prompt changes materially. Known
+limit: the factual axis has no pole separation on either model's fluent
+text — its noise floor keeps it near zero rather than misfiring.
