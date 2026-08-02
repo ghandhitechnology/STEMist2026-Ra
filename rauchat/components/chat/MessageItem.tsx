@@ -10,6 +10,7 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { Diagram, Message, ToolEvent } from "@/lib/types";
+import { useSmoothText } from "@/lib/useSmoothStream";
 import styles from "./chat.module.css";
 import { Markdown } from "./Markdown";
 import { ToolEventList, toolRunningVerb } from "./ToolEventCard";
@@ -192,6 +193,13 @@ export const MessageItem = memo(function MessageItem({
   const [clamped, setClamped] = useState(false);
   const [expandedTurn, setExpandedTurn] = useState(false);
 
+  // §4.8 — while streaming, the shown text trails the real content a few
+  // characters per frame so bursty chunks flow in instead of cutting in.
+  const smoothContent = useSmoothText(
+    message.content,
+    isStreaming && message.role === "assistant"
+  );
+
   // §8 — clamp very tall completed assistant turns. Measured once the turn
   // settles; never while streaming (the height is still moving).
   useEffect(() => {
@@ -219,7 +227,7 @@ export const MessageItem = memo(function MessageItem({
 
   const toolEvents = message.toolEvents ?? [];
   const runningTool = toolEvents.find((e) => e.status === "running");
-  const showThinking = isStreaming && message.content.length === 0;
+  const showThinking = isStreaming && smoothContent.length === 0;
   const thinkingLabel =
     statusLabel ?? (runningTool ? toolRunningVerb(runningTool.tool) : "Thinking");
 
@@ -256,10 +264,11 @@ export const MessageItem = memo(function MessageItem({
           />
         ) : null}
 
-        {message.content ? (
+        {smoothContent ? (
           <Markdown
-            content={message.content}
+            content={smoothContent}
             className={isStreaming ? styles.streaming : undefined}
+            streaming={isStreaming}
           />
         ) : null}
 
