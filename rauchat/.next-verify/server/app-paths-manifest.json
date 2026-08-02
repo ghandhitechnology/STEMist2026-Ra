@@ -1,0 +1,9 @@
+{
+  "/api/models/route": "app/api/models/route.js",
+  "/api/traits/status/route": "app/api/traits/status/route.js",
+  "/api/skills/route": "app/api/skills/route.js",
+  "/api/profile/route": "app/api/profile/route.js",
+  "/api/files/route": "app/api/files/route.js",
+  "/api/chat/route": "app/api/chat/route.js",
+  "/page": "app/page.js"
+}

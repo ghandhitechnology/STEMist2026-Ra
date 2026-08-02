@@ -640,6 +640,36 @@
   margin: 0 0 var(--rau-space-6);
 }
 
+/* KaTeX math (§4.7) — inherit prose colour; display blocks get breathing
+   room and scroll sideways instead of overflowing the 68ch measure. KaTeX's
+   default 1.21em reads oversized against the chat type scale. */
+.prose :global(.katex) {
+  font-size: 1.06em;
+}
+.prose :global(.katex-display) {
+  margin: var(--rau-space-6) 0;
+  padding: var(--rau-space-1) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* ≠ — a KaTeX "=" with the diagonal drawn here (see the \neq macro in
+   Markdown.tsx). The "=" centres on the math axis (~box centre), so the
+   slash centres on the box and leans bottom-left → top-right. */
+.prose :global(.rau-neq) {
+  position: relative;
+}
+.prose :global(.rau-neq)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 0.62em;
+  width: 0.055em;
+  border-radius: 0.03em;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(20deg);
+}
+
 .prose h1 {
   margin: var(--rau-space-9) 0 var(--rau-space-5);
   font-size: var(--rau-fs-2xl);
