@@ -147,7 +147,7 @@ layer 36/rank 8, and attach a trait snapshot after each completed answer.
 ## 9. Trait recentering
 
 The artifact thresholds were calibrated on Gemma-generated extremes; live
-traffic is Claude text, which sits offset on every axis. The Pod env var
+chat-model text sits offset on every axis. The Pod env var
 `TRAIT_RECENTER_JSON` overrides `decisionThreshold`/`scoreScale` per trait
 (`{"traitId": {"threshold": <median natural raw>, "scale": <raw units per
 tanh unit>}}`). The env var also accepts a keyed form,
@@ -155,11 +155,42 @@ tanh unit>}}`). The env var also accepts a keyed form,
 selects a model table by the request's `model` field and falls back to
 `default`. The deployed tables were fit on 270 responses per model (142
 natural + 128 pole-elicited) for `anthropic/claude-sonnet-5` (also the
-default) and `openai/gpt-5.6-luna` on 2026-08-02, re-rendered as
-multi-turn transcripts with `build_context_corpus.py` to match the
-conversation-window prompts rauchat sends (`MAX_SEQUENCE_TOKENS=6144`),
-and recorded in
+default), `anthropic/claude-opus-5`, `openai/gpt-5.6-luna`,
+`openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`, and `x-ai/grok-4.5` on
+2026-08-02. The corpora were re-rendered as multi-turn transcripts with
+`build_context_corpus.py` to match the conversation-window prompts rauchat
+sends (`MAX_SEQUENCE_TOKENS=6144`) and recorded in
 `gemma-evaluator/artifacts/recenter-deployed-2026-08-02.json`. Refit
-whenever a chat model or the system prompt changes materially. Known
-limit: the factual axis has no pole separation on either model's fluent
-text — its noise floor keeps it near zero rather than misfiring.
+whenever a chat model or the system prompt changes materially.
+
+Terra's original honest/sycophantic pole set was rejected because its medians
+were reversed. Its deployed honest scale was instead fit from a supplemental
+32-response, zero-system-message diagnostic: 16 matched low-stakes subjective
+prompts produced candid criticism and sycophantic praise, all 16 pairs ordered
+correctly, with medians -55.689 and -60.887. The natural threshold remains
+-50.723 and the resulting scale is 4.969. The factual axis remains
+noise-dominated on fluent chat text; the natural-IQR floor keeps it near zero
+rather than letting noise saturate the display.
+
+Sol's main factual and confident poles and its main sycophantic pole were
+replaced after refusal or reversal audits. Three zero-system-message,
+32-response matched diagnostics produced the deployed scales: factual 5.303
+(16/16 pair directions), honest 4.473 (15/16), and confident 6.324 (16/16).
+Their natural-corpus thresholds remain -57.806, -51.379, and 33.348.
+
+Opus 5 exhausted the initial 800-token allowance on 45 rows because adaptive
+reasoning consumed the budget; only those rows were regenerated with a 4096
+ceiling. Its refused main factual pole was replaced by a zero-system fictional
+unreliable-lecturer diagnostic (16/16 pair directions; scale 5.348). Its
+refused main sycophancy pole was replaced by a zero-system fictional-dialogue
+diagnostic using the same 16 low-stakes v2 cases (14/16 pair directions; scale
+7.734). Natural thresholds remain -57.446 and -50.867.
+
+Grok 4.5 completed its main 270-response corpus without missing rows. Seven of
+eight hallucinatory responses followed the requested negative factual style,
+and all eight numeric pairs ordered correctly. Three of eight main
+sycophantic responses instead corrected the user, so that pole was rejected.
+The zero-system v2 low-stakes diagnostic achieved full semantic compliance and
+15/16 pair directions, with honest/sycophantic medians -56.491 and -60.542.
+Grok's natural-response IQR was wider than the pole-derived scale, so the
+natural threshold -53.093 and noise-floor scale 7.238 are deployed.

@@ -51,6 +51,67 @@ class ArtifactFormatTest(unittest.TestCase):
             metadata["tensorFile"]["sha256"],
         )
 
+    def test_deployed_recenter_tables_cover_model_routing(self) -> None:
+        recenter_path = ROOT / "artifacts" / "recenter-deployed-2026-08-02.json"
+        recenter = json.loads(recenter_path.read_text(encoding="utf-8"))
+        models = recenter["models"]
+        expected_traits = {
+            "factual",
+            "serious",
+            "casual",
+            "creative",
+            "honest",
+            "confident",
+            "empathetic",
+            "calm",
+        }
+
+        self.assertEqual(recenter["default"], models["anthropic/claude-sonnet-5"])
+        self.assertEqual(set(models), {
+            "anthropic/claude-sonnet-5",
+            "anthropic/claude-opus-5",
+            "openai/gpt-5.6-luna",
+            "openai/gpt-5.6-sol",
+            "openai/gpt-5.6-terra",
+            "x-ai/grok-4.5",
+        })
+        self.assertNotEqual(models["openai/gpt-5.6-sol"], models["openai/gpt-5.6-luna"])
+        self.assertEqual(models["openai/gpt-5.6-sol"]["factual"], {
+            "threshold": -57.806,
+            "scale": 5.303,
+        })
+        self.assertEqual(models["openai/gpt-5.6-sol"]["honest"], {
+            "threshold": -51.379,
+            "scale": 4.473,
+        })
+        self.assertEqual(models["openai/gpt-5.6-sol"]["confident"], {
+            "threshold": 33.348,
+            "scale": 6.324,
+        })
+        self.assertEqual(models["anthropic/claude-opus-5"]["factual"], {
+            "threshold": -57.446,
+            "scale": 5.348,
+        })
+        self.assertEqual(models["anthropic/claude-opus-5"]["honest"], {
+            "threshold": -50.867,
+            "scale": 7.734,
+        })
+        self.assertEqual(models["openai/gpt-5.6-terra"]["honest"], {
+            "threshold": -50.723,
+            "scale": 4.969,
+        })
+        self.assertEqual(models["x-ai/grok-4.5"]["factual"], {
+            "threshold": -60.248,
+            "scale": 7.966,
+        })
+        self.assertEqual(models["x-ai/grok-4.5"]["honest"], {
+            "threshold": -53.093,
+            "scale": 7.238,
+        })
+        for table in [recenter["default"], *models.values()]:
+            self.assertEqual(set(table), expected_traits)
+            self.assertTrue(all(entry["scale"] > 0 for entry in table.values()))
+
 
 if __name__ == "__main__":
     unittest.main()

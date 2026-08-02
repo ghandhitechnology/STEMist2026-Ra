@@ -1,11 +1,10 @@
 /**
  * lib/server/openrouter.ts — the single OpenRouter client for Rauchat.
  *
- * Every model (OpenAI GPT-5.6 Sol/Luna/Terra and Anthropic Sonnet/Opus/
- * Fable 5) is reached through OpenRouter's OpenAI-compatible endpoint with
- * the one OPENROUTER_API_KEY. Thinking levels are expressed via OpenRouter's
- * unified `reasoning` parameter, which OpenRouter translates per-provider
- * (OpenAI `reasoning_effort`, Anthropic `thinking.budget_tokens`).
+ * Every model (OpenAI GPT-5.6 Sol/Luna/Terra, Anthropic Sonnet/Opus 5, and xAI
+ * Grok 4.5) is reached through OpenRouter's OpenAI-compatible endpoint with the
+ * one OPENROUTER_API_KEY. Thinking levels are expressed via OpenRouter's unified
+ * `reasoning` parameter, which it translates per-provider.
  */
 
 import OpenAI from "openai";
