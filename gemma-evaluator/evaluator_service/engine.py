@@ -35,6 +35,14 @@ class GemmaEvaluator:
         self.unit_vectors: torch.Tensor | None = None
         self.decision_threshold: torch.Tensor | None = None
         self.score_scale: torch.Tensor | None = None
+        self.recentered_traits: list[str] = []
+        unknown = set(settings.trait_recenter) - {
+            axis.trait_id for axis in bundle.axes
+        }
+        if unknown:
+            raise RuntimeError(
+                f"TRAIT_RECENTER_JSON names unknown traits: {sorted(unknown)}"
+            )
         self.status = "loading"
         self.detail = "waiting for model load"
         self._load_lock = threading.Lock()
@@ -67,16 +75,28 @@ class GemmaEvaluator:
                 self.model = model
                 self.device = device
                 self.unit_vectors = self.bundle.unit_vectors.float().to(device)
+                overrides = self.settings.trait_recenter
                 self.decision_threshold = torch.tensor(
-                    [axis.decision_threshold for axis in self.bundle.axes],
+                    [
+                        overrides.get(axis.trait_id, {}).get(
+                            "threshold", axis.decision_threshold
+                        )
+                        for axis in self.bundle.axes
+                    ],
                     dtype=torch.float32,
                     device=device,
                 )
                 self.score_scale = torch.tensor(
-                    [axis.score_scale for axis in self.bundle.axes],
+                    [
+                        overrides.get(axis.trait_id, {}).get(
+                            "scale", axis.score_scale
+                        )
+                        for axis in self.bundle.axes
+                    ],
                     dtype=torch.float32,
                     device=device,
                 )
+                self.recentered_traits = sorted(overrides)
                 self.status = "ready"
                 self.detail = "model and vectors loaded"
             except Exception as exc:
@@ -129,6 +149,10 @@ class GemmaEvaluator:
             }
             for axis, score in zip(self.bundle.axes, signed_scores, strict=True)
         ]
+        raw_by_trait = {
+            axis.trait_id: round(float(raw.item()), 3)
+            for axis, raw in zip(self.bundle.axes, raw_scores, strict=True)
+        }
 
         del outputs, hidden_states, activation, raw_scores, signed_scores
         gc.collect()
@@ -141,6 +165,8 @@ class GemmaEvaluator:
                 "sequenceTokens": len(full_ids),
                 "responseTokens": response_end - response_start,
                 "truncated": truncated,
+                "rawScores": raw_by_trait,
+                "recenteredTraits": self.recentered_traits,
                 "latencyMs": round((time.perf_counter() - started) * 1000),
             },
         }

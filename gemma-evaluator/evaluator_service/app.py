@@ -77,6 +77,7 @@ async def health(
         },
         "detail": engine.detail,
         "warnings": engine.bundle.warnings,
+        "recenteredTraits": engine.recentered_traits,
     }
     return JSONResponse(payload, status_code=200 if engine.status == "ready" else 503)
 
