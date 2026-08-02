@@ -9,7 +9,7 @@ _ Neural Transparency: Mechanistic Interpretability Interfaces for Anticipating 
 
 ## How We Built It
 
-** Gemma **
+**Gemma**
 The behavioral trait vectors were extracted from Gemma 4 14B in Google Colab on an A100 using pole-character comparison through difference of means. GPT-5.6 Luna served as an LLM judge.
 
 Layer 36 was selected by testing every decoder layer with leakage-proof grouped cross-validation (GroupKFold, scored by held-out ROC-AUC) and choosing the layer where all traits were separated the most.
@@ -19,7 +19,7 @@ Raw projections are scaled with tanh to squash the range from -1 to 1, keeping a
 ### Model Calibration
 Each model has slightly different styles, which land in slightly different regions of Gemma's activation areas. To address this, each proprietary model gets its own calibration table, and a series of "normal" and "pole" answers are analyzed to recalibrate the zero point of each model.
 
-** Interface **
+**Interface**
 The interface is a React app built with TypeScript. The app has three columns: a collapsible sidebar containing conversation history and account configuration, the chat-bar UI in the middle, and the Model Telemetry pane on the right.
 
 ## Accomplishments That We're Proud Of
@@ -30,15 +30,15 @@ The interface is a React app built with TypeScript. The app has three columns: a
 
 ## What We Learned
 
-** Problem 1: Models Reject Calibration prompts ** 
+**Problem 1: Models Reject Calibration prompts** 
 
 Several of the big models, like GPT-5.6 Sol and Claude Opus 5, heavily rejected requests for sycophantic behavior. There had to be subtle workarounds for prompting these models, which helped me expand my knowledge of AI guardrails and prompt engineering.
 
- ** Problem 2: Large-Scale Judging ** 
+ **Problem 2: Large-Scale Judging** 
 
 Originally, the plan was to rate Gemma's responses by hand. However, as the scale grew larger, that seemed unreasonable; therefore, the need to use an LLM for judging arose. GPT-5.6 Luna was a fabulous choice in accuracy, cost, and speed.
 
-** Problem 3: Incorrect Scaling ** 
+**Problem 3: Incorrect Scaling** 
 
 Originally, the app used sigmoid functions for data scaling. However, the sigmoid function turned out to emphasize the extremes too much and relatively ignore the middle values. Therefore, I had to change to another scaling technique and learned to be more careful about using sigmoid everywhere for scaling.
 
