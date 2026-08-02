@@ -220,7 +220,7 @@ function EmptyLine({ children }: { children: React.ReactNode }) {
 type BodyProps = {
   event: ToolEvent;
   resolveDownloadUrl: (target: string) => string;
-  onInstallSkill?: (event: ToolEvent) => void;
+  onInstallSkill?: (event: ToolEvent) => void | Promise<void>;
 };
 
 function WebSearchBody({ event }: BodyProps) {
@@ -462,6 +462,9 @@ function FileWriteBody({ event }: BodyProps) {
 
 function SkillBody({ event, onInstallSkill }: BodyProps) {
   const rec = asRec(event.result);
+  const [installState, setInstallState] = useState<
+    "review" | "installing" | "installed" | "error"
+  >("review");
 
   if (!rec) {
     if (event.status === "running") return <Shimmer rows={3} />;
@@ -470,24 +473,32 @@ function SkillBody({ event, onInstallSkill }: BodyProps) {
 
   const name = pickStr(rec, "name", "title") ?? event.title;
   const description = pickStr(rec, "description", "summary") ?? event.detail;
-  const installed = rec.installed === true;
+  const instructions = pickStr(rec, "instructions") ?? "";
+  const capabilities = asRec(rec.capabilities);
+  const tools = asArr(capabilities?.tools)
+    .filter((tool): tool is string => typeof tool === "string")
+    .join(", ");
+  const skills = asArr(capabilities?.skills)
+    .filter((skill): skill is string => typeof skill === "string")
+    .join(", ");
+  const installed = rec.installed === true || installState === "installed";
 
   const meta: Array<[string, string | undefined]> = [
-    ["trigger", pickStr(rec, "trigger", "when")],
-    [
-      "tools",
-      Array.isArray(rec.tools)
-        ? rec.tools.filter((t): t is string => typeof t === "string").join(", ")
-        : pickStr(rec, "tools"),
-    ],
-    [
-      "files",
-      Array.isArray(rec.files)
-        ? String(rec.files.length)
-        : pickStr(rec, "files") ?? pickNum(rec, "fileCount")?.toString(),
-    ],
+    ["tools", tools || undefined],
+    ["skills", skills || undefined],
     ["scope", pickStr(rec, "scope") ?? "Workspace"],
   ];
+
+  async function install() {
+    if (!onInstallSkill || installState === "installing") return;
+    setInstallState("installing");
+    try {
+      await onInstallSkill(event);
+      setInstallState("installed");
+    } catch {
+      setInstallState("error");
+    }
+  }
 
   return (
     <div>
@@ -502,16 +513,33 @@ function SkillBody({ event, onInstallSkill }: BodyProps) {
           </Fragment>
         ))}
       </div>
+      {instructions ? (
+        <div className={styles.skillReview}>
+          <span className={styles.skillReviewLabel}>Instructions</span>
+          <div className={styles.skillInstructions}>{instructions}</div>
+        </div>
+      ) : null}
       {installed ? (
         <div className={styles.skillInstalled}>Installed to Workspace › Skills</div>
       ) : (
         <div className={styles.skillFooter}>
+          <span
+            className={`${styles.skillInstallStatus} ${
+              installState === "error" ? styles.skillInstallError : ""
+            }`}
+            role={installState === "error" ? "alert" : "status"}
+          >
+            {installState === "error"
+              ? "Installation failed. Try again."
+              : "Review this draft before installing."}
+          </span>
           <button
             type="button"
             className={styles.secondaryBtn}
-            onClick={() => onInstallSkill?.(event)}
+            disabled={!onInstallSkill || installState === "installing"}
+            onClick={() => void install()}
           >
-            Install skill
+            {installState === "installing" ? "Installing…" : "Install skill"}
           </button>
         </div>
       )}
@@ -543,7 +571,7 @@ export type ToolEventCardProps = {
   event: ToolEvent;
   /** Retry handler for the error state's ghost button. */
   onRetry?: (event: ToolEvent) => void;
-  onInstallSkill?: (event: ToolEvent) => void;
+  onInstallSkill?: (event: ToolEvent) => void | Promise<void>;
   /** Opens a diagram in the side panel. */
   onOpenDiagram?: (diagram: Diagram) => void;
   /** Id of the diagram currently open, so its card can show as active. */

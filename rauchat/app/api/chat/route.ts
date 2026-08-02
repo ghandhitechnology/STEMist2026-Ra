@@ -32,7 +32,7 @@ import { clampThinking, getModel } from "@/lib/models";
 import { createSSEResponse } from "@/lib/server/sse";
 import { getOpenRouter, reasoningParam } from "@/lib/server/openrouter";
 import { OPENAI_TOOLS, executeTool, toolEventTitle } from "@/lib/server/tools";
-import { getSkill, listAutoLoadSkills } from "@/lib/server/skills";
+import { listAutoLoadSkills, resolveSkills } from "@/lib/server/skills";
 import { getTraitSnapshot } from "@/lib/server/traits";
 import { getUserId, unauthorized } from "@/lib/server/auth";
 import { getProfile, type Profile } from "@/lib/server/profile";
@@ -48,7 +48,7 @@ const MAX_TRAIT_CONTEXT_CHARS = 20000;
 // to fit a complete app, not just a chat reply.
 const MAX_TOKENS = 16384;
 
-const BASE_SYSTEM_PROMPT = `You are Rauchat, a helpful, precise AI assistant with access to tools for web search, PDF creation, reading/writing files in a sandboxed workspace, and publishing diagrams. Use tools when they would materially improve the accuracy or usefulness of your answer; do not narrate tool availability, just use them. Respond in clear, well-structured markdown.
+const BASE_SYSTEM_PROMPT = `You are Rauchat, a helpful, precise AI assistant. When tools are available, use them when they would materially improve the accuracy or usefulness of your answer; do not narrate tool availability, just use them. Respond in clear, well-structured markdown.
 
 # Diagrams
 
@@ -215,19 +215,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const research = requestedTools.includes("research");
-  const webSearch = requestedTools.includes("web_search") || research;
-
   return createSSEResponse(async (send, signal) => {
-    // --- System prompt: base + selected skill + all autoLoad skills.
-    const activeSkills: Skill[] = [];
-    if (skillId) {
-      const selected = await getSkill(userId, skillId);
-      if (selected) activeSkills.push(selected);
+    // --- System prompt: selected + auto-loaded skills, recursively expanded
+    // through their declared skill capabilities.
+    const autoLoadSkills = await listAutoLoadSkills(userId);
+    const rootSkillIds = [
+      ...(skillId ? [skillId] : []),
+      ...autoLoadSkills.map((skill) => skill.id),
+    ];
+    const activeSkills: Skill[] = await resolveSkills(userId, rootSkillIds);
+
+    // Skill tool capabilities join the tools explicitly selected in the
+    // composer. Diagrams and memory remain foundational capabilities.
+    const effectiveToolNames = new Set<ToolName>(requestedTools);
+    for (const skill of activeSkills) {
+      for (const tool of skill.capabilities?.tools ?? []) {
+        effectiveToolNames.add(tool);
+      }
     }
-    for (const s of await listAutoLoadSkills(userId)) {
-      if (!activeSkills.some((a) => a.id === s.id)) activeSkills.push(s);
-    }
+    const research = effectiveToolNames.has("research");
+    const webSearch = effectiveToolNames.has("web_search") || research;
+
     let system = BASE_SYSTEM_PROMPT + buildSkillSection(activeSkills);
     if (research) {
       system +=
@@ -245,14 +253,13 @@ export async function POST(req: NextRequest) {
 
     // --- Tools available this turn.
     const activeToolNames = new Set<ToolName>([
-      "pdf_create",
-      "file_read",
-      "file_write",
-      "skill_make",
       "diagram",
       // Always available: the model must be able to remember on any turn.
       "memory_add",
     ]);
+    for (const tool of effectiveToolNames) {
+      if (tool !== "research") activeToolNames.add(tool);
+    }
     if (webSearch) activeToolNames.add("web_search");
     const tools = OPENAI_TOOLS.filter((t) =>
       activeToolNames.has(t.function.name as ToolName)

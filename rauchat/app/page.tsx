@@ -41,6 +41,7 @@ import type {
   Conversation,
   Message,
   Skill,
+  SkillDraft,
   ToolEvent,
   ToolName,
   TraitSnapshot,
@@ -530,10 +531,37 @@ export default function Home() {
     [branchFrom, store]
   );
 
-  const handleInstallSkill = useCallback((event: ToolEvent) => {
-    const result = event.result as Partial<Skill> | undefined;
-    if (!result?.id) return;
-    const skill = result as Skill;
+  const handleInstallSkill = useCallback(async (event: ToolEvent) => {
+    const draft = event.result as Partial<SkillDraft> | undefined;
+    if (
+      !draft?.draftId ||
+      !draft.name ||
+      !draft.description ||
+      !draft.instructions
+    ) {
+      throw new Error("The generated skill draft is incomplete.");
+    }
+    const response = await fetch("/api/skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        name: draft.name,
+        description: draft.description,
+        instructions: draft.instructions,
+        source: "generated",
+        draftId: draft.draftId,
+        capabilities: draft.capabilities ?? { tools: [], skills: [] },
+      }),
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as
+        | { error?: unknown }
+        | null;
+      throw new Error(
+        typeof body?.error === "string" ? body.error : "Skill installation failed."
+      );
+    }
+    const skill = (await response.json()) as Skill;
     setSkills((prev) => (prev.some((s) => s.id === skill.id) ? prev : [skill, ...prev]));
     setActiveSkillId(skill.id);
   }, []);

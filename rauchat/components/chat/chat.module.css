@@ -1374,8 +1374,46 @@
 .skillFooter {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--rau-space-3);
   margin-top: 10px;
+}
+.skillReview {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: var(--rau-hairline) solid var(--rau-border-faint);
+}
+.skillReviewLabel {
+  display: block;
+  margin-bottom: var(--rau-space-2);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+  text-transform: uppercase;
+  letter-spacing: var(--rau-ls-caps);
+}
+.skillInstructions {
+  max-height: 180px;
+  overflow: auto;
+  padding: var(--rau-space-4) var(--rau-space-5);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-bg-inset);
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-micro);
+  line-height: 18px;
+  color: var(--rau-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.skillInstallStatus {
+  min-width: 0;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+}
+.skillInstallError {
+  color: var(--rau-danger);
 }
 .skillInstalled {
   margin-top: 10px;

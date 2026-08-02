@@ -2,8 +2,8 @@
 
 /**
  * components/modals/SkillsModal.tsx
- * Lists skills (GET /api/skills → { skills: Skill[] }), creates a skill
- * (POST /api/skills), deletes a skill (DELETE /api/skills/:id), and lets
+ * Lists, creates, imports, deletes, and configures skills through /api/skills.
+ * Skills can declare tool capabilities and dependencies on other skills. It lets
  * the user toggle a skill "active for this session" — a client-only flag,
  * lifted to the parent if `activeSkillIds`/`onToggleActive` are supplied,
  * otherwise held internally. Also lets the user toggle a skill's
@@ -12,10 +12,10 @@
  * per-session selection.
  */
 
-import { useEffect, useState } from "react";
-import type { Skill } from "@/lib/types";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import type { Skill, ToolName } from "@/lib/types";
 import { Modal } from "./Modal";
-import { IconTrash } from "./icons";
+import { IconPencil, IconTrash } from "./icons";
 import styles from "./SkillsModal.module.css";
 
 export type SkillsModalProps = {
@@ -27,6 +27,88 @@ export type SkillsModalProps = {
 };
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
+
+const CAPABILITY_TOOLS: Array<{ id: ToolName; label: string }> = [
+  { id: "web_search", label: "Web search" },
+  { id: "research", label: "Research mode" },
+  { id: "pdf_create", label: "Create PDFs" },
+  { id: "file_read", label: "Read files" },
+  { id: "file_write", label: "Write files" },
+  { id: "skill_make", label: "Draft skills" },
+  { id: "diagram", label: "Create diagrams" },
+  { id: "memory_add", label: "Save memory" },
+];
+
+type SkillInput = {
+  name: string;
+  description: string;
+  instructions: string;
+  source?: NonNullable<Skill["source"]>;
+  capabilities: NonNullable<Skill["capabilities"]>;
+  /** Original id from an imported file; used only to remap dependencies. */
+  importId?: string;
+};
+
+function sourceLabel(skill: Skill): string {
+  if (skill.source === "generated") return "Generated";
+  if (skill.source === "imported") return "Imported";
+  return "Manual";
+}
+
+function capabilitySummary(skill: Skill): string {
+  const toolCount = skill.capabilities?.tools.length ?? 0;
+  const skillCount = skill.capabilities?.skills.length ?? 0;
+  const parts: string[] = [];
+  if (toolCount) parts.push(`${toolCount} tool${toolCount === 1 ? "" : "s"}`);
+  if (skillCount) parts.push(`${skillCount} skill${skillCount === 1 ? "" : "s"}`);
+  return parts.join(" · ");
+}
+
+function importableSkill(raw: unknown): SkillInput | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  const name = typeof record.name === "string" ? record.name.trim() : "";
+  const description =
+    typeof record.description === "string" ? record.description.trim() : "";
+  const instructions =
+    typeof record.instructions === "string" ? record.instructions.trim() : "";
+  if (
+    !name ||
+    name.length > 100 ||
+    !description ||
+    description.length > 300 ||
+    !instructions ||
+    instructions.length > 20000
+  ) {
+    return null;
+  }
+
+  const rawCapabilities =
+    record.capabilities && typeof record.capabilities === "object"
+      ? (record.capabilities as Record<string, unknown>)
+      : record;
+  const tools = Array.isArray(rawCapabilities.tools)
+    ? rawCapabilities.tools.filter(
+        (tool): tool is ToolName =>
+          typeof tool === "string" &&
+          CAPABILITY_TOOLS.some((candidate) => candidate.id === tool)
+      )
+    : [];
+  const skills = Array.isArray(rawCapabilities.skills)
+    ? rawCapabilities.skills
+        .filter((skill): skill is string => typeof skill === "string")
+        .map((skill) => skill.trim())
+        .filter(Boolean)
+    : [];
+  return {
+    name,
+    description,
+    instructions,
+    source: "imported",
+    capabilities: { tools, skills },
+    ...(typeof record.id === "string" ? { importId: record.id } : {}),
+  };
+}
 
 export function SkillsModal({
   open,
@@ -40,11 +122,17 @@ export function SkillsModal({
   const [internalActive, setInternalActive] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formInstructions, setFormInstructions] = useState("");
+  const [formTools, setFormTools] = useState<Set<ToolName>>(new Set());
+  const [formSkills, setFormSkills] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const activeSet =
     activeSkillIds !== undefined ? new Set(activeSkillIds) : internalActive;
@@ -79,6 +167,7 @@ export function SkillsModal({
       setConfirmDeleteId(null);
       setShowForm(false);
       setFormError(null);
+      setImportStatus(null);
     }
   }, [open]);
 
@@ -129,29 +218,100 @@ export function SkillsModal({
     }
   }
 
-  async function handleCreate() {
-    if (!formName.trim() || !formInstructions.trim()) {
-      setFormError("Name and instructions are required.");
+  async function postSkill(input: SkillInput): Promise<Skill> {
+    const res = await fetch("/api/skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", accept: "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as
+        | { error?: unknown }
+        | null;
+      throw new Error(
+        typeof body?.error === "string" ? body.error : `Request failed (${res.status})`
+      );
+    }
+    return (await res.json()) as Skill;
+  }
+
+  function resetForm() {
+    setFormName("");
+    setFormDescription("");
+    setFormInstructions("");
+    setFormTools(new Set());
+    setFormSkills(new Set());
+    setFormError(null);
+    setEditingId(null);
+  }
+
+  function openNewSkillForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditSkillForm(skill: Skill) {
+    setEditingId(skill.id);
+    setFormName(skill.name);
+    setFormDescription(skill.description);
+    setFormInstructions(skill.instructions);
+    setFormTools(new Set(skill.capabilities?.tools ?? []));
+    setFormSkills(new Set(skill.capabilities?.skills ?? []));
+    setFormError(null);
+    setShowForm(true);
+  }
+
+  async function handleSubmit() {
+    if (!formName.trim() || !formDescription.trim() || !formInstructions.trim()) {
+      setFormError("Name, description, and instructions are required.");
       return;
     }
     setSubmitting(true);
     setFormError(null);
     try {
-      const res = await fetch("/api/skills", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formName.trim(),
-          description: formDescription.trim(),
-          instructions: formInstructions,
-        }),
-      });
-      if (!res.ok) throw new Error(`Request failed (${res.status})`);
-      const created: Skill = await res.json();
-      setSkills((prev) => [created, ...prev]);
-      setFormName("");
-      setFormDescription("");
-      setFormInstructions("");
+      const payload = {
+        name: formName.trim(),
+        description: formDescription.trim(),
+        instructions: formInstructions.trim(),
+        capabilities: {
+          tools: Array.from(formTools),
+          skills: Array.from(formSkills),
+        },
+      };
+      if (editingId) {
+        const response = await fetch(
+          `/api/skills?id=${encodeURIComponent(editingId)}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              accept: "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as
+            | { error?: unknown }
+            | null;
+          throw new Error(
+            typeof body?.error === "string"
+              ? body.error
+              : `Request failed (${response.status})`
+          );
+        }
+        const updated = (await response.json()) as Skill;
+        setSkills((previous) =>
+          previous.map((skill) => (skill.id === updated.id ? updated : skill))
+        );
+      } else {
+        const created = await postSkill({
+          ...payload,
+          source: "manual",
+        });
+        setSkills((prev) => [created, ...prev]);
+      }
+      resetForm();
       setShowForm(false);
     } catch (err) {
       setFormError(
@@ -159,6 +319,128 @@ export function SkillsModal({
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function toggleFormTool(tool: ToolName) {
+    setFormTools((previous) => {
+      const next = new Set(previous);
+      if (next.has(tool)) next.delete(tool);
+      else next.add(tool);
+      return next;
+    });
+  }
+
+  function toggleFormSkill(id: string) {
+    setFormSkills((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 1_000_000) {
+      setImportStatus("Skill files must be smaller than 1 MB.");
+      return;
+    }
+
+    setImporting(true);
+    setImportStatus(null);
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const container =
+        parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      const rawSkills = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(container?.skills)
+          ? container.skills
+          : container?.skill
+            ? [container.skill]
+            : [parsed];
+      const pending = rawSkills.map(importableSkill);
+      if (pending.some((skill) => skill === null)) {
+        throw new Error(
+          "Each imported skill needs a name, description, and instructions."
+        );
+      }
+
+      const queue = pending as SkillInput[];
+      const importedIdToName = new Map(
+        queue
+          .filter((skill) => skill.importId)
+          .map((skill) => [skill.importId!, skill.name] as const)
+      );
+      for (const skill of queue) {
+        skill.capabilities = {
+          ...skill.capabilities,
+          skills: skill.capabilities.skills.map(
+            (reference) => importedIdToName.get(reference) ?? reference
+          ),
+        };
+      }
+      const available = [...skills];
+      const knownReferences = new Set([
+        ...available.flatMap((skill) => [skill.id, skill.name.toLowerCase()]),
+        ...queue.map((skill) => skill.name.toLowerCase()),
+      ]);
+      const unknownReference = queue
+        .flatMap((skill) => skill.capabilities.skills)
+        .find(
+          (reference) =>
+            !knownReferences.has(reference) &&
+            !knownReferences.has(reference.toLowerCase())
+        );
+      if (unknownReference) {
+        throw new Error(`Unknown skill capability: ${unknownReference}`);
+      }
+      const installed: Skill[] = [];
+      while (queue.length) {
+        const pendingNames = new Set(queue.map((skill) => skill.name.toLowerCase()));
+        const index = queue.findIndex((skill) =>
+          skill.capabilities.skills.every((reference) => {
+            const normalized = reference.toLowerCase();
+            return (
+              available.some(
+                (candidate) =>
+                  candidate.id === reference ||
+                  candidate.name.toLowerCase() === normalized
+              ) || !pendingNames.has(normalized)
+            );
+          })
+        );
+        if (index === -1) {
+          throw new Error("Imported skills contain a circular dependency.");
+        }
+        const [next] = queue.splice(index, 1);
+        const { importId: _importId, ...payload } = next;
+        void _importId;
+        const created = await postSkill(payload);
+        available.push(created);
+        installed.push(created);
+      }
+
+      setSkills((previous) => [
+        ...installed,
+        ...previous.filter(
+          (skill) => !installed.some((created) => created.id === skill.id)
+        ),
+      ]);
+      setImportStatus(
+        `Installed ${installed.length} skill${installed.length === 1 ? "" : "s"} from ${file.name}.`
+      );
+    } catch (error) {
+      setImportStatus(
+        error instanceof Error ? error.message : "The skill file could not be imported."
+      );
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -170,20 +452,43 @@ export function SkillsModal({
         <span className={styles.count}>
           {loadState === "loaded" ? `${skills.length} installed` : " "}
         </span>
-        {!showForm && (
+        <div className={styles.toolbarActions}>
+          <input
+            ref={importInputRef}
+            className={styles.fileInput}
+            type="file"
+            accept=".json,application/json"
+            onChange={(event) => void handleImport(event)}
+          />
           <button
             type="button"
-            className={`${styles.button} ${styles.buttonSecondary} ${styles.buttonSmall}`}
-            onClick={() => setShowForm(true)}
+            className={`${styles.button} ${styles.buttonGhost} ${styles.buttonSmall}`}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
           >
-            New skill
+            {importing ? "Installing…" : "Install from file"}
           </button>
-        )}
+          {!showForm && (
+            <button
+              type="button"
+              className={`${styles.button} ${styles.buttonSecondary} ${styles.buttonSmall}`}
+              onClick={openNewSkillForm}
+            >
+              New skill
+            </button>
+          )}
+        </div>
       </div>
 
       <p className={styles.explainer}>
-        Auto-loaded skills are active in every conversation.
+        Select one skill for this session, or auto-load skills in every conversation.
       </p>
+
+      {importStatus ? (
+        <p className={styles.importStatus} role="status">
+          {importStatus}
+        </p>
+      ) : null}
 
       {loadState === "loading" && (
         <p className={styles.stateText}>Loading skills…</p>
@@ -202,7 +507,7 @@ export function SkillsModal({
           <button
             type="button"
             className={`${styles.button} ${styles.buttonSecondary}`}
-            onClick={() => setShowForm(true)}
+            onClick={openNewSkillForm}
           >
             New skill
           </button>
@@ -216,7 +521,7 @@ export function SkillsModal({
               <div className={styles.rowBody}>
                 <span className={styles.rowName}>
                   {skill.name}
-                  <span className={styles.tag}>Generated</span>
+                  <span className={styles.tag}>{sourceLabel(skill)}</span>
                   {skill.autoLoad && (
                     <span className={styles.autoTag}>
                       <span className={styles.autoDot} />
@@ -224,7 +529,14 @@ export function SkillsModal({
                     </span>
                   )}
                 </span>
-                <span className={styles.rowDesc}>{skill.description}</span>
+                <span className={styles.rowDesc}>
+                  {skill.description}
+                  {capabilitySummary(skill) ? (
+                    <span className={styles.capabilitySummary}>
+                      {` · ${capabilitySummary(skill)}`}
+                    </span>
+                  ) : null}
+                </span>
               </div>
               <div className={styles.rowActions}>
                 {confirmDeleteId === skill.id ? (
@@ -249,6 +561,14 @@ export function SkillsModal({
                   </div>
                 ) : (
                   <>
+                    <button
+                      type="button"
+                      className={styles.editIcon}
+                      aria-label={`Edit ${skill.name}`}
+                      onClick={() => openEditSkillForm(skill)}
+                    >
+                      <IconPencil size={14} />
+                    </button>
                     <button
                       type="button"
                       className={styles.deleteIcon}
@@ -294,6 +614,9 @@ export function SkillsModal({
 
       {showForm && (
         <div className={styles.form}>
+          <div className={styles.formHeading}>
+            {editingId ? "Edit skill" : "New skill"}
+          </div>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="rau-skill-name">
               Name
@@ -331,14 +654,56 @@ export function SkillsModal({
               rows={6}
             />
           </div>
+          <fieldset className={styles.capabilityFieldset}>
+            <legend className={styles.label}>Tool capabilities</legend>
+            <span className={styles.fieldHint}>
+              These tools become available whenever the skill is active.
+            </span>
+            <div className={styles.capabilityGrid}>
+              {CAPABILITY_TOOLS.map((tool) => (
+                <label className={styles.capabilityOption} key={tool.id}>
+                  <input
+                    type="checkbox"
+                    checked={formTools.has(tool.id)}
+                    onChange={() => toggleFormTool(tool.id)}
+                  />
+                  <span>{tool.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className={styles.capabilityFieldset}>
+            <legend className={styles.label}>Skill capabilities</legend>
+            <span className={styles.fieldHint}>
+              Activate these installed skills as dependencies.
+            </span>
+            {skills.some((skill) => skill.id !== editingId) ? (
+              <div className={styles.capabilityGrid}>
+                {skills
+                  .filter((skill) => skill.id !== editingId)
+                  .map((skill) => (
+                  <label className={styles.capabilityOption} key={skill.id}>
+                    <input
+                      type="checkbox"
+                      checked={formSkills.has(skill.id)}
+                      onChange={() => toggleFormSkill(skill.id)}
+                    />
+                    <span>{skill.name}</span>
+                  </label>
+                  ))}
+              </div>
+            ) : (
+              <span className={styles.fieldHint}>No other skills installed.</span>
+            )}
+          </fieldset>
           {formError && <span className={styles.errorText}>{formError}</span>}
           <div className={styles.formActions}>
             <button
               type="button"
               className={`${styles.button} ${styles.buttonGhost}`}
               onClick={() => {
+                resetForm();
                 setShowForm(false);
-                setFormError(null);
               }}
             >
               Cancel
@@ -347,9 +712,15 @@ export function SkillsModal({
               type="button"
               className={`${styles.button} ${styles.buttonPrimary}`}
               disabled={submitting}
-              onClick={handleCreate}
+              onClick={handleSubmit}
             >
-              {submitting ? "Creating…" : "Create skill"}
+              {submitting
+                ? editingId
+                  ? "Saving…"
+                  : "Creating…"
+                : editingId
+                  ? "Save changes"
+                  : "Create skill"}
             </button>
           </div>
         </div>
