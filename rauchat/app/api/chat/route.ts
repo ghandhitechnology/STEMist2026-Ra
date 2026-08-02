@@ -36,6 +36,7 @@ import { OPENAI_TOOLS, executeTool, toolEventTitle } from "@/lib/server/tools";
 import { listAutoLoadSkills, resolveSkills } from "@/lib/server/skills";
 import { getTraitSnapshot } from "@/lib/server/traits";
 import { getUserId, unauthorized } from "@/lib/server/auth";
+import { consumeRateLimit } from "@/lib/server/ratelimit";
 import { getProfile, type Profile } from "@/lib/server/profile";
 import { readMemory } from "@/lib/server/memory";
 import { buildUserMessageWithAttachments } from "@/lib/server/attachments";
@@ -214,6 +215,10 @@ function buildMemorySection(memory: string): string {
 export async function POST(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return unauthorized();
+  const allowance = await consumeRateLimit(userId, "chat");
+  if (!allowance.ok) {
+    return Response.json({ error: allowance.message }, { status: 429 });
+  }
   let body: unknown;
   try {
     body = await req.json();

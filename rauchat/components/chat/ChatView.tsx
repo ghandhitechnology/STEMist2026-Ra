@@ -22,7 +22,13 @@ import type { MessageActions } from "./MessageItem";
 import { ModelSelector } from "./ModelSelector";
 import { AnimatedTitle, type TitleAnimateMode } from "./AnimatedTitle";
 import { DEFAULT_MODEL_ID, getModel } from "@/lib/models";
-import { IconBranch, IconMore, IconPanelRight, IconShare } from "./icons";
+import {
+  IconBranch,
+  IconMore,
+  IconPanelLeft,
+  IconPanelRight,
+  IconShare,
+} from "./icons";
 
 const STREAMING_ID = "__rauchat_streaming__";
 
@@ -60,6 +66,12 @@ export type ChatViewProps = {
   assistantName?: string;
   telemetryOpen?: boolean;
   onToggleTelemetry?: () => void;
+  /**
+   * Compact layouts hide the sidebar off-canvas, so the only way back to it
+   * is from here. The control renders below the 900px breakpoint only.
+   */
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
   onShare?: () => void;
   onBranchConversation?: () => void;
   onOverflow?: (anchor: HTMLElement) => void;
@@ -97,6 +109,8 @@ export const ChatView = memo(function ChatView({
   assistantName,
   telemetryOpen,
   onToggleTelemetry,
+  sidebarOpen,
+  onToggleSidebar,
   onShare,
   onBranchConversation,
   onOverflow,
@@ -198,6 +212,18 @@ export const ChatView = memo(function ChatView({
       </button>
 
       <header className={`${styles.topbar} ${scrolled ? styles.topbarScrolled : ""}`}>
+        {onToggleSidebar ? (
+          <button
+            type="button"
+            className={styles.sidebarToggle}
+            onClick={onToggleSidebar}
+            aria-expanded={sidebarOpen ?? false}
+            aria-label="Toggle conversations"
+            title="Conversations"
+          >
+            <IconPanelLeft size={16} />
+          </button>
+        ) : null}
         <div className={styles.topbarTitleGroup}>
           <h1 className={styles.topbarTitle} title={title}>
             <AnimatedTitle

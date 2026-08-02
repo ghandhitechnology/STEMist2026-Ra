@@ -401,3 +401,25 @@
     transition: none;
   }
 }
+
+/* ---- Compact (phone) ----
+   Keep 900px in step with app/shell.module.css. */
+
+@media (max-width: 900px) {
+  .trigger {
+    height: 44px;
+    max-width: 160px;
+  }
+
+  /* The trigger sits mid-bar, so a 304px panel anchored to it runs off the
+     right edge and is clipped by the shell. It spans the viewport instead. */
+  .panel {
+    position: fixed;
+    top: var(--rau-topbar-h);
+    left: var(--rau-space-4);
+    right: var(--rau-space-4);
+    width: auto;
+    max-height: calc(100dvh - var(--rau-topbar-h) - var(--rau-space-8));
+    overflow-y: auto;
+  }
+}

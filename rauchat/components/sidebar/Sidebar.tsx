@@ -6,7 +6,8 @@
  * as `store` so the parent owns the single source of truth.
  */
 
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { filterConversations } from "@/lib/conversation-search";
 import type { UseConversations } from "@/lib/store";
 import { accountInitials, type Account } from "../modals/AccountModal";
 import {
@@ -16,6 +17,7 @@ import {
   IconPlus,
   IconSearch,
   IconSkill,
+  IconX,
 } from "../modals/icons";
 import { ConversationItem } from "./ConversationItem";
 import styles from "./Sidebar.module.css";
@@ -55,6 +57,17 @@ export type SidebarProps = {
   filesCount?: number;
   /** Keeps the parent grid track in sync with the rail/panel animation. */
   onCollapsedChange?: (collapsed: boolean) => void;
+  /**
+   * Controlled collapse. Omitted → the sidebar keeps owning the state, which
+   * is what every non-shell caller wants.
+   */
+  collapsed?: boolean;
+  /**
+   * Fired after any action that takes the user out of the sidebar (open a
+   * conversation, start one, open a panel). The compact layout renders the
+   * sidebar as an overlay drawer and uses this to close it behind them.
+   */
+  onNavigate?: () => void;
 };
 
 export function Sidebar({
@@ -70,8 +83,11 @@ export function Sidebar({
   skillsCount,
   filesCount,
   onCollapsedChange,
+  collapsed: collapsedProp,
+  onNavigate,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [ownCollapsed, setOwnCollapsed] = useState(false);
+  const collapsed = collapsedProp ?? ownCollapsed;
   const [query, setQuery] = useState("");
 
   const streamingSet = useMemo(
@@ -87,22 +103,32 @@ export function Sidebar({
   );
   const leavingSet = useMemo(() => new Set(store.leavingIds), [store.leavingIds]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return store.conversations;
-    return store.conversations.filter((c) =>
-      c.title.toLowerCase().includes(q)
-    );
-  }, [store.conversations, query]);
+  const filtered = useMemo(
+    () => filterConversations(store.conversations, query),
+    [store.conversations, query]
+  );
 
   function handleSearchChange(event: ChangeEvent<HTMLInputElement>) {
     setQuery(event.target.value);
   }
 
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    // Escape clears rather than bubbling to any global shortcut handler.
+    if (event.key === "Escape" && query) {
+      event.stopPropagation();
+      setQuery("");
+    }
+  }
+
   function handleToggleCollapsed() {
     const next = !collapsed;
-    setCollapsed(next);
+    setOwnCollapsed(next);
     onCollapsedChange?.(next);
+  }
+
+  function handleSelect(id: string) {
+    store.selectConversation(id);
+    onNavigate?.();
   }
 
   let lastGroup: string | null = null;
@@ -137,7 +163,10 @@ export function Sidebar({
         <button
           type="button"
           className={styles.newChatButton}
-          onClick={() => store.createConversation()}
+          onClick={() => {
+            store.createConversation();
+            onNavigate?.();
+          }}
         >
           <IconPlus size={16} />
           <span className={styles.newChatLabel}>New chat</span>
@@ -152,10 +181,22 @@ export function Sidebar({
               className={styles.searchInput}
               value={query}
               onChange={handleSearchChange}
+              onKeyDown={handleSearchKeyDown}
               placeholder="Search"
               aria-label="Search conversations"
             />
-            {!query && <span className={styles.searchHint}>⌘K</span>}
+            {query ? (
+              <button
+                type="button"
+                className={styles.searchClear}
+                aria-label="Clear search"
+                onClick={() => setQuery("")}
+              >
+                <IconX size={12} />
+              </button>
+            ) : (
+              <span className={styles.searchHint}>⌘K</span>
+            )}
           </div>
         </div>
       )}
@@ -201,7 +242,7 @@ export function Sidebar({
                     isEntering={enteringSet.has(conversation.id)}
                     isLeaving={leavingSet.has(conversation.id)}
                     onRowAnimationEnd={store.finishRowAnimation}
-                    onSelect={store.selectConversation}
+                    onSelect={handleSelect}
                     onRename={store.renameConversation}
                     onDelete={store.deleteConversation}
                   />
@@ -212,7 +253,14 @@ export function Sidebar({
       )}
 
       <div className={styles.workspaceSection}>
-        <button type="button" className={styles.navRow} onClick={onOpenSkills}>
+        <button
+          type="button"
+          className={styles.navRow}
+          onClick={() => {
+            onOpenSkills();
+            onNavigate?.();
+          }}
+        >
           <IconSkill size={16} className={styles.navIcon} />
           <span className={styles.navLabel}>Skills</span>
           {typeof skillsCount === "number" && (
@@ -222,7 +270,10 @@ export function Sidebar({
         <button
           type="button"
           className={styles.navRow}
-          onClick={onOpenWorkspace}
+          onClick={() => {
+            onOpenWorkspace();
+            onNavigate?.();
+          }}
         >
           <IconFolder size={16} className={styles.navIcon} />
           <span className={styles.navLabel}>Workspace</span>
@@ -233,7 +284,10 @@ export function Sidebar({
         <button
           type="button"
           className={styles.navRow}
-          onClick={onOpenSettings}
+          onClick={() => {
+            onOpenSettings();
+            onNavigate?.();
+          }}
         >
           <IconGear size={16} className={styles.navIcon} />
           <span className={styles.navLabel}>Settings</span>
@@ -245,7 +299,10 @@ export function Sidebar({
           <button
             type="button"
             className={styles.accountRow}
-            onClick={onOpenAccount}
+            onClick={() => {
+              onOpenAccount();
+              onNavigate?.();
+            }}
             aria-label="Open account"
             title={account.user.email}
           >
