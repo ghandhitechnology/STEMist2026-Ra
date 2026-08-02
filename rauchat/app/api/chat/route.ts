@@ -421,6 +421,11 @@ export async function POST(req: NextRequest) {
 
         for (const tc of toolCalls) {
           const toolName = tc.name as ToolName;
+          // The provider can emit prose, call a sketch tool, then resume its
+          // prose on the next loop turn. Preserve that exact insertion point
+          // instead of hoisting every finished sketch above the whole reply.
+          const textOffset =
+            toolName === "svg_render" ? finalAssistantText.length : undefined;
           let input: Record<string, unknown> = {};
           try {
             input = tc.arguments ? JSON.parse(tc.arguments) : {};
@@ -434,6 +439,7 @@ export async function POST(req: NextRequest) {
             tool: toolName,
             status: "running",
             title,
+            textOffset,
           } satisfies ToolEvent);
 
           try {
@@ -447,6 +453,7 @@ export async function POST(req: NextRequest) {
               tool: toolName,
               status: "done",
               title,
+              textOffset,
               detail,
               result: clientResult ?? result,
             } satisfies ToolEvent);
@@ -466,6 +473,7 @@ export async function POST(req: NextRequest) {
               tool: toolName,
               status: "error",
               title,
+              textOffset,
               detail: errMessage,
             } satisfies ToolEvent);
             chatMessages.push({

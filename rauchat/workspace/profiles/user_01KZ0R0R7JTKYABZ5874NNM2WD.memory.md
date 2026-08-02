@@ -1,0 +1,1 @@
+- [2026-08-02] The user's name is Andy Ha and prefers to be called "Andy HA".

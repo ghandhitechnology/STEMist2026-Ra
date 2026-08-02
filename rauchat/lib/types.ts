@@ -106,6 +106,8 @@ export type ToolEvent = {
   tool: ToolName;
   status: "running" | "done" | "error";
   title: string;
+  /** Assistant-content offset where this tool call occurred. */
+  textOffset?: number;
   detail?: string;
   result?: unknown;
 };

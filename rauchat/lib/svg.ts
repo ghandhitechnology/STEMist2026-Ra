@@ -352,6 +352,7 @@ export function detectVisualIntent(text: string): boolean {
  */
 export const SVG_DRAWING_RULES = `Inline sketch rules (\`svg_render\` — always available):
 - Use freely for small drawings that support the topic (flows, geometry, icons, schematics). Reference the sketch naturally in your reply; do not paste the SVG source as text.
+- Placement follows the call: prose emitted before svg_render appears above the sketch, and prose emitted after the tool result appears below it. Introduce the drawing, call the tool exactly where it belongs, then continue the explanation.
 - Never use svg_render for interactive apps, long documents, full programs, or anything the user will iterate on as a deliverable — those go in the \`diagram\` artifact tool.
 - Transparent line art only: fill='none', stroke='currentColor', no background rects or solid color blocks. Complete standalone <svg> with a viewBox; no scripts or external references.
 - Layered construction: structural/skeletal lines first (proportions, major axes, bounding volumes), then detail.

@@ -316,7 +316,7 @@ Three columns in a CSS grid, full viewport height, no page-level scrolling.
 
 Column separators are `1px solid var(--rau-border-subtle)` applied as the right border of the sidebar and the left border of the telemetry panel. No gaps, no rounded panel corners, no floating cards — panels are flush to the viewport edge.
 
-Both side panels are resizable by a 5px invisible hit-area straddling the divider: sidebar 220–360px, telemetry 288–440px. On hover the divider's visible 1px becomes `--rau-border-strong` after 200ms delay; while dragging it becomes `--rau-border-loud` with `cursor: col-resize`. Widths persist to localStorage.
+Both side panels are resizable by an invisible hit-area at the divider: sidebar 220–360px, telemetry 288px–approximately one third of the viewport. On hover the divider's visible 1px becomes `--rau-border-strong` after 200ms delay; while dragging it becomes `--rau-border-loud` with `cursor: col-resize`. Widths persist to localStorage, and telemetry plots reflow with the resized panel.
 
 ### 3.2 Breakpoints
 

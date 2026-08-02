@@ -14,7 +14,15 @@ import { useSmoothText } from "@/lib/useSmoothStream";
 import styles from "./chat.module.css";
 import { Markdown } from "./Markdown";
 import { ThinkingSection } from "./ThinkingSection";
-import { ToolEventList, toolRunningVerb } from "./ToolEventCard";
+import {
+  ToolEventCard,
+  ToolEventList,
+  toolRunningVerb,
+} from "./ToolEventCard";
+import {
+  buildAssistantFlow,
+  hasInlineSketchAnchor,
+} from "@/lib/message-flow";
 import {
   IconBranch,
   IconCheck,
@@ -24,8 +32,6 @@ import {
   IconThumbDown,
   IconThumbUp,
 } from "./icons";
-
-const MAX_TURN_HEIGHT = 1600; // §8 long message truncation
 
 /**
  * Tools whose completed result is the deliverable itself (an artifact card,
@@ -198,7 +204,7 @@ export const MessageItem = memo(function MessageItem({
   message,
   isStreaming = false,
   statusLabel,
-  assistantName = "Rauchat",
+  assistantName = "Assistant",
   onRetryToolEvent,
   onInstallSkill,
   onOpenDiagram,
@@ -206,32 +212,12 @@ export const MessageItem = memo(function MessageItem({
   resolveDownloadUrl,
   ...actions
 }: MessageItemProps) {
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const [clamped, setClamped] = useState(false);
-  const [expandedTurn, setExpandedTurn] = useState(false);
-
   // §4.8 — while streaming, the shown text trails the real content a few
   // characters per frame so bursty chunks flow in instead of cutting in.
   const smoothContent = useSmoothText(
     message.content,
     isStreaming && message.role === "assistant"
   );
-
-  // §8 — clamp very tall completed assistant turns. Measured once the turn
-  // settles; never while streaming (the height is still moving).
-  useEffect(() => {
-    if (message.role !== "assistant" || isStreaming || expandedTurn) return;
-    const el = bodyRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const measure = () => {
-      const tall = el.scrollHeight > MAX_TURN_HEIGHT;
-      setClamped((prev) => (prev === tall ? prev : tall));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [message.role, message.content, isStreaming, expandedTurn]);
 
   if (message.role === "user") {
     const attachments = message.attachments ?? [];
@@ -260,6 +246,10 @@ export const MessageItem = memo(function MessageItem({
 
   const toolEvents = message.toolEvents ?? [];
   const deliverableEvents = toolEvents.filter(isDeliverable);
+  const anchoredSketches = deliverableEvents.filter(hasInlineSketchAnchor);
+  const unanchoredDeliverables = deliverableEvents.filter(
+    (event) => !hasInlineSketchAnchor(event),
+  );
   const traceEvents = toolEvents.filter((e) => !isDeliverable(e));
   const thinkingText = message.thinking ?? "";
   const hasTrace = thinkingText.length > 0 || traceEvents.length > 0;
@@ -271,8 +261,11 @@ export const MessageItem = memo(function MessageItem({
   const showThinking = isStreaming && smoothContent.length === 0 && !hasTrace;
   const thinkingLabel =
     statusLabel ?? (runningTool ? toolRunningVerb(runningTool.tool) : "Thinking");
-
-  const showClamp = clamped && !expandedTurn;
+  const responseFlow = buildAssistantFlow(smoothContent, anchoredSketches);
+  let lastTextIndex = -1;
+  responseFlow.forEach((part, index) => {
+    if (part.kind === "text") lastTextIndex = index;
+  });
 
   return (
     <article
@@ -290,15 +283,15 @@ export const MessageItem = memo(function MessageItem({
         </time>
       </header>
 
-      <div
-        ref={bodyRef}
-        className={`${styles.assistantBody} ${showClamp ? styles.clamped : ""}`}
-      >
+      <div className={styles.assistantBody}>
         {hasTrace ? (
           <ThinkingSection
             thinking={thinkingText}
             events={traceEvents}
             isStreaming={isStreaming}
+            latchKey={
+              isStreaming ? `${message.id}:${message.createdAt}` : undefined
+            }
             onRetry={onRetryToolEvent}
             onInstallSkill={onInstallSkill}
             onOpenDiagram={onOpenDiagram}
@@ -307,9 +300,9 @@ export const MessageItem = memo(function MessageItem({
           />
         ) : null}
 
-        {deliverableEvents.length > 0 ? (
+        {unanchoredDeliverables.length > 0 ? (
           <ToolEventList
-            events={deliverableEvents}
+            events={unanchoredDeliverables}
             onRetry={onRetryToolEvent}
             onInstallSkill={onInstallSkill}
             onOpenDiagram={onOpenDiagram}
@@ -318,13 +311,31 @@ export const MessageItem = memo(function MessageItem({
           />
         ) : null}
 
-        {smoothContent ? (
-          <Markdown
-            content={smoothContent}
-            className={isStreaming ? styles.streaming : undefined}
-            streaming={isStreaming}
-          />
-        ) : null}
+        {responseFlow.map((part, index) =>
+          part.kind === "text" ? (
+            <Markdown
+              key={part.key}
+              content={part.content}
+              className={
+                isStreaming && index === lastTextIndex
+                  ? styles.streaming
+                  : undefined
+              }
+              streaming={isStreaming}
+            />
+          ) : (
+            <div className={styles.inlineSketchBlock} key={part.key}>
+              <ToolEventCard
+                event={part.event}
+                onRetry={onRetryToolEvent}
+                onInstallSkill={onInstallSkill}
+                onOpenDiagram={onOpenDiagram}
+                openDiagramId={openDiagramId}
+                resolveDownloadUrl={resolveDownloadUrl}
+              />
+            </div>
+          ),
+        )}
 
         {showThinking ? (
           <div className={styles.thinking}>
@@ -337,18 +348,6 @@ export const MessageItem = memo(function MessageItem({
           </div>
         ) : null}
       </div>
-
-      {showClamp ? (
-        <div className={styles.clampFooter}>
-          <button
-            type="button"
-            className={styles.showMoreBtn}
-            onClick={() => setExpandedTurn(true)}
-          >
-            Show more
-          </button>
-        </div>
-      ) : null}
 
       {!isStreaming && message.content ? (
         <ActionBar message={message} {...actions} />

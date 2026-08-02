@@ -270,7 +270,16 @@
 .column {
   max-width: var(--rau-measure);
   margin: 0 auto;
-  padding: var(--rau-space-9) var(--rau-space-8) 0;
+  /* Bottom padding clears the composer dock's 24px legibility mask so the
+     finished-turn action bar isn't shaded when pinned to the latest. */
+  padding: var(--rau-space-9) var(--rau-space-8) var(--rau-space-9);
+}
+
+/* Grows the scroll range while a just-sent turn is anchored to the top of
+   the viewport (§4.8); sized imperatively by MessageList, 0 when idle. */
+.tailSpacer {
+  height: 0;
+  pointer-events: none;
 }
 
 /* Turn rhythm: 32px between turns (§3.4) */
@@ -279,7 +288,7 @@
   margin-bottom: var(--rau-space-9);
 }
 .turn:last-child {
-  margin-bottom: var(--rau-space-2);
+  margin-bottom: 0;
 }
 
 /* Assistant turn --------------------------------------------------- */
@@ -488,29 +497,6 @@
   color: var(--rau-text-tertiary);
 }
 
-/* §8 Long message truncated */
-.clamped {
-  max-height: 1600px;
-  overflow: hidden;
-}
-.clampFooter {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  margin-top: -64px;
-  padding-top: var(--rau-space-10);
-  pointer-events: none;
-  background: linear-gradient(to bottom, transparent, var(--rau-bg-l0) 64px);
-}
-.clampFooter > * {
-  pointer-events: auto;
-}
-.showMoreBtn {
-  composes: ghostBtn;
-  height: 26px;
-  border: var(--rau-hairline) solid var(--rau-border-subtle);
-}
-
 /* §8 Message generation failed */
 .turnError {
   padding: 10px var(--rau-space-5);
@@ -579,8 +565,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 38%;
+  /* Starts a little higher than before so the mark + wordmark + chips
+     still read as one centered block after the logo adds height. */
+  padding-top: 30%;
   text-align: center;
+}
+.emptyLogo {
+  display: block;
+  width: 120px;
+  height: auto;
+  margin-bottom: var(--rau-space-7);
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
 }
 .emptyWordmark {
   font-size: var(--rau-fs-xl);
@@ -1210,9 +1207,13 @@
   line-height: var(--rau-lh-xs);
   font-weight: var(--rau-fw-semibold);
   letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-secondary);
 }
 .reasoningProse strong {
   color: var(--rau-text-secondary);
+}
+.reasoningProse > :first-child {
+  margin-top: 0;
 }
 .cardErrorBody {
   padding: var(--rau-space-4) var(--rau-space-5);
@@ -1626,7 +1627,13 @@
 }
 
 /* svg_render — transparent line drawings; ink follows --rau-text-primary. */
+.inlineSketchBlock {
+  display: block;
+  width: 100%;
+  margin: var(--rau-space-7) 0;
+}
 .svgFigure {
+  width: 100%;
   margin: 0;
   border: var(--rau-hairline) solid var(--rau-border-subtle);
   border-radius: var(--rau-radius-lg);
@@ -1637,7 +1644,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px;
+  padding: var(--rau-space-7);
   background: transparent;
   color: var(--rau-text-primary);
   overflow: auto;
@@ -1645,11 +1652,47 @@
 }
 .svgCanvas > svg {
   display: block;
-  width: auto;
+  width: 100%;
   max-width: 100%;
   height: auto;
-  max-height: 420px;
+  max-height: 480px;
   background: transparent;
+}
+.svgCanvasPreparing > svg :is(path, line, polyline, polygon, rect, circle, ellipse),
+.svgCanvasPreparing > svg text {
+  opacity: 0;
+}
+.svgCanvasDrawing > svg :is(path, line, polyline, polygon, rect, circle, ellipse) {
+  stroke-dasharray: var(--sketch-stroke-length);
+  stroke-dashoffset: var(--sketch-stroke-length);
+  animation: sketchStrokeReveal var(--sketch-stroke-duration)
+    var(--rau-ease-standard) var(--sketch-stroke-delay) forwards;
+}
+.svgCanvasDrawing > svg text {
+  opacity: 0;
+  animation: sketchLabelReveal 320ms var(--rau-ease-standard)
+    var(--sketch-label-delay) forwards;
+}
+@keyframes sketchStrokeReveal {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: var(--sketch-stroke-length);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sketchLabelReveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .svgCaption {
   margin: 0;
@@ -1659,6 +1702,18 @@
   color: var(--rau-text-tertiary);
   text-align: center;
   border-top: var(--rau-hairline) solid var(--rau-border-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .svgCanvasPreparing > svg :is(path, line, polyline, polygon, rect, circle, ellipse),
+  .svgCanvasPreparing > svg text,
+  .svgCanvasDrawing > svg :is(path, line, polyline, polygon, rect, circle, ellipse),
+  .svgCanvasDrawing > svg text {
+    opacity: 1;
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
 }
 
 /* §7 grouping */
