@@ -361,3 +361,19 @@
   gap: var(--rau-space-3);
   flex-shrink: 0;
 }
+
+/* ---- Compact (phone) ----
+   Keep 900px in step with app/shell.module.css. */
+
+@media (max-width: 900px) {
+  .input,
+  .button {
+    height: 44px;
+  }
+
+  /* 16px is the floor below which iOS Safari zooms the page on focus. */
+  .input,
+  .memoryEditor {
+    font-size: 16px;
+  }
+}

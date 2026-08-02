@@ -376,3 +376,24 @@
 .dangerInput {
   max-width: 220px;
 }
+
+/* ---- Compact (phone) ----
+   Keep 900px in step with app/shell.module.css. */
+
+@media (max-width: 900px) {
+  /* Two 13px controls side by side leave no room for their labels. */
+  .fieldGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 16px is the floor below which iOS Safari zooms the page on focus. */
+  .input,
+  .select {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .dangerInput {
+    max-width: 100%;
+  }
+}

@@ -203,6 +203,13 @@ export const IconShare = (p: IconProps) => (
   </Svg>
 );
 
+export const IconPanelLeft = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2" y="2.75" width="12" height="10.5" rx="1.5" />
+    <path d="M6 2.75v10.5" />
+  </Svg>
+);
+
 export const IconPanelRight = (p: IconProps) => (
   <Svg {...p}>
     <rect x="2" y="2.75" width="12" height="10.5" rx="1.5" />

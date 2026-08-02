@@ -62,6 +62,14 @@ import type {
   TraitSnapshot,
 } from "@/lib/types";
 
+/**
+ * Below this width the shell is a single column and the two side panels are
+ * overlay drawers (app/shell.module.css and the component modules). The query
+ * is duplicated here because the collapse *state* has to follow the layout —
+ * a drawer that opens by default covers the transcript it sits on.
+ */
+const COMPACT_QUERY = "(max-width: 900px)";
+
 const TELEMETRY_COLLAPSED_KEY = "rauchat:telemetry-collapsed";
 const TELEMETRY_WIDTH_KEY = "rauchat:telemetry-width";
 const MODEL_CHOICE_KEY = "rauchat:model-choice";
@@ -248,6 +256,40 @@ export default function Home() {
     };
     window.addEventListener("resize", handleViewportResize);
     return () => window.removeEventListener("resize", handleViewportResize);
+  }, []);
+
+  // Runs after the restore effects above so the compact layout has the last
+  // word: a phone that reopens the panels from localStorage would start with
+  // the transcript buried under two overlays.
+  const compactRef = useRef(false);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia(COMPACT_QUERY);
+    const apply = (matches: boolean) => {
+      compactRef.current = matches;
+      setCompact(matches);
+      if (!matches) return;
+      setSidebarCollapsed(true);
+      setTelemetryCollapsed(true);
+    };
+    apply(query.matches);
+    const onChange = (event: MediaQueryListEvent) => apply(event.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  /** Drawers close behind whatever the user just went into the sidebar for. */
+  const closeSidebarWhenCompact = useCallback(() => {
+    if (compactRef.current) setSidebarCollapsed(true);
+  }, []);
+
+  const closeOverlayPanels = useCallback(() => {
+    setSidebarCollapsed(true);
+    setTelemetryCollapsed(true);
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => !prev);
   }, []);
 
   const resizeTelemetry = useCallback((width: number) => {
@@ -744,6 +786,9 @@ export default function Home() {
     if (!latestDiagramId) return;
     if (lastAutoOpened.current === latestDiagramId) return;
     lastAutoOpened.current = latestDiagramId;
+    // On a phone the panel is a full-screen overlay, so opening it unasked
+    // would bury the turn that produced it. The transcript card still opens it.
+    if (compactRef.current) return;
     setOpenDiagramId(latestDiagramId);
     setTelemetryCollapsed(true);
   }, [latestDiagramId]);
@@ -785,6 +830,15 @@ export default function Home() {
 
   return (
     <div className={shellClass} style={shellStyle}>
+      {compact && (!sidebarCollapsed || !telemetryCollapsed) ? (
+        <button
+          type="button"
+          className={shell.overlayScrim}
+          aria-label="Close panel"
+          onClick={closeOverlayPanels}
+        />
+      ) : null}
+
       <Sidebar
         store={store}
         onOpenSkills={() => setSkillsOpen(true)}
@@ -797,7 +851,9 @@ export default function Home() {
         onTitleAnimationEnd={handleTitleAnimationEnd}
         skillsCount={skills.length}
         filesCount={filesCount}
+        collapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
+        onNavigate={closeSidebarWhenCompact}
       />
 
       <ChatView
@@ -819,6 +875,8 @@ export default function Home() {
         }
         telemetryOpen={!telemetryCollapsed}
         onToggleTelemetry={toggleTelemetry}
+        sidebarOpen={!sidebarCollapsed}
+        onToggleSidebar={toggleSidebar}
         onBranchConversation={handleBranchConversation}
         defaultTools={DEFAULT_TOOLS}
         unavailableTools={unavailableTools}

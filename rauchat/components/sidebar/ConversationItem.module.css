@@ -274,6 +274,49 @@
   outline: none;
 }
 
+/* ---- Compact (phone) rows ----
+   Keep 900px in step with app/shell.module.css. */
+
+@media (max-width: 900px) {
+  /* The pop-in/pop-out keyframes interpolate to --rau-row-h, so the token is
+     what has to change here — setting `height` alone would make a new row
+     grow to 48px and then snap back to 32px when the animation ends. */
+  .row {
+    --rau-row-h: 48px;
+    height: var(--rau-row-h);
+  }
+
+  /* Touch has no hover, so rename/delete would be unreachable. They surface
+     on the open conversation instead, and only that row pays the width. */
+  .rowSelected .actions {
+    opacity: 1;
+  }
+
+  .rowSelected .title,
+  .row:hover .title {
+    padding-right: 0;
+  }
+
+  .rowSelected .title {
+    padding-right: 94px;
+  }
+
+  .actionButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .renameInput,
+  .confirmRow {
+    height: 44px;
+  }
+
+  /* 16px is the floor below which iOS Safari zooms the page on focus. */
+  .renameInput {
+    font-size: 16px;
+  }
+}
+
 /* ---- Reduced motion (§5.6) ----
    A new row simply is there; a swept row simply is gone. Removal still lands,
    because lib/store.ts also runs the pop on a timer. */
