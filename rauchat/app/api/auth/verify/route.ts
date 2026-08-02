@@ -12,6 +12,15 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getWorkOS, saveSession } from "@workos-inc/authkit-nextjs";
 import { crossSiteRejection } from "@/lib/server/http";
+import { getAuthRuntimeConfig } from "@/lib/server/auth-config";
+import {
+  authConfigurationResponse,
+  authErrorResponse,
+  getWorkOSErrorDetails,
+  isUnsupportedAuthChallenge,
+  isWorkOSUnavailable,
+  logAuthEvent,
+} from "@/lib/server/auth-errors";
 
 export const runtime = "nodejs";
 
@@ -31,34 +40,56 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    return authErrorResponse("INVALID_REQUEST", "Invalid JSON body.", 400);
   }
   const parsed = VerifySchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json(
-      { error: "Enter the 6-digit code from your email." },
-      { status: 400 }
+    return authErrorResponse(
+      "INVALID_REQUEST",
+      "Enter the 6-digit code from your email.",
+      400
     );
   }
 
-  const clientId = process.env.WORKOS_CLIENT_ID;
-  if (!clientId) {
-    return Response.json({ error: "Auth is not configured." }, { status: 500 });
+  let config;
+  try {
+    config = getAuthRuntimeConfig(req);
+  } catch (error) {
+    return authConfigurationResponse("verify", error);
   }
 
   try {
     const authResponse =
       await getWorkOS().userManagement.authenticateWithEmailVerification({
-        clientId,
+        clientId: config.clientId,
         code: parsed.data.code,
         pendingAuthenticationToken: parsed.data.pendingAuthenticationToken,
       });
-    await saveSession(authResponse, req);
+    await saveSession(authResponse, config.sessionUrl);
     return Response.json({ ok: true });
-  } catch {
-    return Response.json(
-      { error: "That code is incorrect or has expired." },
-      { status: 400 }
+  } catch (err) {
+    const details = getWorkOSErrorDetails(err);
+    if (isUnsupportedAuthChallenge(details)) {
+      logAuthEvent("unsupported_challenge", { details, route: "verify" });
+      return authErrorResponse(
+        "AUTH_CHALLENGE_UNSUPPORTED",
+        "Email verification succeeded, but this account requires an authentication step Rauchat does not support yet.",
+        409
+      );
+    }
+    if (isWorkOSUnavailable(details)) {
+      logAuthEvent("provider_unavailable", { details, route: "verify" });
+      return authErrorResponse(
+        "AUTH_PROVIDER_UNAVAILABLE",
+        "The authentication service is temporarily unavailable. Try again.",
+        502
+      );
+    }
+    logAuthEvent("verification_failed", { details, route: "verify" });
+    return authErrorResponse(
+      "VERIFICATION_CODE_INVALID",
+      "That code is incorrect or has expired.",
+      400
     );
   }
 }

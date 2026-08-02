@@ -12,6 +12,7 @@
  */
 
 import { useState, type FormEvent } from "react";
+import { authMessage } from "@/lib/auth-client";
 import styles from "../sign-in/auth.module.css";
 
 export default function ResetPasswordPage() {
@@ -39,7 +40,7 @@ export default function ResetPasswordPage() {
         setBusy(false);
         return;
       }
-      setError(data?.error ?? "Could not start a reset. Try again.");
+      setError(authMessage(data, "Could not start a reset. Try again."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");
@@ -63,7 +64,7 @@ export default function ResetPasswordPage() {
         window.location.href = "/sign-in?reset=1";
         return;
       }
-      setError(data?.error ?? "That reset code is invalid or has expired.");
+      setError(authMessage(data, "That reset code is invalid or has expired."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");

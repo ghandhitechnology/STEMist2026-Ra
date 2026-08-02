@@ -12,6 +12,14 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getWorkOS } from "@workos-inc/authkit-nextjs";
 import { crossSiteRejection } from "@/lib/server/http";
+import { getAuthRuntimeConfig } from "@/lib/server/auth-config";
+import {
+  authConfigurationResponse,
+  authErrorResponse,
+  getWorkOSErrorDetails,
+  isWorkOSUnavailable,
+  logAuthEvent,
+} from "@/lib/server/auth-errors";
 
 export const runtime = "nodejs";
 
@@ -19,23 +27,6 @@ const ConfirmSchema = z.object({
   token: z.string().trim().min(1).max(4096),
   newPassword: z.string().min(8).max(256),
 });
-
-/** The subset of a WorkOS exception we actually read. */
-type WorkOSErrorLike = {
-  code?: string;
-  message?: string;
-  rawData?: { code?: string };
-};
-
-function friendlyResetError(err: unknown): string {
-  const workosError = (err ?? {}) as WorkOSErrorLike;
-  const code = workosError.code ?? workosError.rawData?.code ?? "";
-  const message = (workosError.message ?? "").toLowerCase();
-  if (code === "password_strength_error" || message.includes("password strength")) {
-    return "That password is too weak. Use at least 10 characters and avoid common words.";
-  }
-  return "That reset code is invalid or has expired.";
-}
 
 export async function POST(req: NextRequest) {
   const crossSite = crossSiteRejection(req);
@@ -45,21 +36,21 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    return authErrorResponse("INVALID_REQUEST", "Invalid JSON body.", 400);
   }
   const parsed = ConfirmSchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json(
-      {
-        error:
-          "Enter the reset code from your email and a password of at least 8 characters.",
-      },
-      { status: 400 }
+    return authErrorResponse(
+      "INVALID_REQUEST",
+      "Enter the reset code from your email and a password of at least 8 characters.",
+      400
     );
   }
 
-  if (!process.env.WORKOS_CLIENT_ID) {
-    return Response.json({ error: "Auth is not configured." }, { status: 500 });
+  try {
+    getAuthRuntimeConfig(req);
+  } catch (error) {
+    return authConfigurationResponse("password-reset-confirm", error);
   }
 
   try {
@@ -69,6 +60,32 @@ export async function POST(req: NextRequest) {
     });
     return Response.json({ ok: true });
   } catch (err) {
-    return Response.json({ error: friendlyResetError(err) }, { status: 400 });
+    const details = getWorkOSErrorDetails(err);
+    logAuthEvent("password_reset_failed", {
+      details,
+      route: "password-reset-confirm",
+    });
+    if (
+      details.code === "password_strength_error" ||
+      details.code === "password_validation_error"
+    ) {
+      return authErrorResponse(
+        "PASSWORD_TOO_WEAK",
+        "That password is too weak. Use at least 10 characters and avoid common words.",
+        400
+      );
+    }
+    if (isWorkOSUnavailable(details)) {
+      return authErrorResponse(
+        "AUTH_PROVIDER_UNAVAILABLE",
+        "The authentication service is temporarily unavailable. Try again.",
+        502
+      );
+    }
+    return authErrorResponse(
+      "PASSWORD_RESET_INVALID",
+      "That reset code is invalid or has expired.",
+      400
+    );
   }
 }

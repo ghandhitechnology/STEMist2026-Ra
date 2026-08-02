@@ -5,9 +5,8 @@
  *             personalization profile and memory file (lib/server/profile.ts,
  *             lib/server/memory.ts), and the WorkOS user record itself.
  *
- * The client navigates to /signout after this resolves. A session cookie
- * left over after deletion is harmless: middleware treats a session whose
- * user no longer resolves as signed-out and bounces back to sign-in.
+ * The client POSTs /signout after this resolves so the now-orphaned local
+ * session cookie is explicitly expired before returning to /sign-in.
  */
 
 import { rm } from "node:fs/promises";

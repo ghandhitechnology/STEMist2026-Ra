@@ -10,14 +10,16 @@
  */
 
 import { useEffect, useState, type FormEvent } from "react";
+import { authMessage } from "@/lib/auth-client";
 import styles from "./auth.module.css";
 
 const OAUTH_ERRORS: Record<string, string> = {
   cancelled: "Sign-in was cancelled.",
   state: "That sign-in link expired. Try again.",
   exchange: "Could not complete sign-in. Try again.",
-  config: "Auth is not configured.",
-  provider: "That sign-in option isn't available. Try another.",
+  pkce: "That sign-in session expired. Try again.",
+  config: "Authentication is not configured correctly. Contact the administrator.",
+  provider: "Could not start provider sign-in. Try again or use a password.",
 };
 
 /** Seconds the resend button stays inert after a code is sent. */
@@ -78,7 +80,7 @@ export default function SignInPage() {
         setBusy(false);
         return;
       }
-      setError(data?.error ?? "Incorrect email or password.");
+      setError(authMessage(data, "Incorrect email or password."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");
@@ -105,7 +107,7 @@ export default function SignInPage() {
         window.location.href = "/";
         return;
       }
-      setError(data?.error ?? "That code is incorrect or has expired.");
+      setError(authMessage(data, "That code is incorrect or has expired."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");
@@ -141,7 +143,7 @@ export default function SignInPage() {
         setBusy(false);
         return;
       }
-      setError(data?.error ?? "Could not send a new code. Try again.");
+      setError(authMessage(data, "Could not send a new code. Try again."));
       setBusy(false);
     } catch {
       setError("Network error. Try again.");

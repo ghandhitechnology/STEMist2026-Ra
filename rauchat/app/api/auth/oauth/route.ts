@@ -12,6 +12,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getWorkOS } from "@workos-inc/authkit-nextjs";
 import { redirectTo } from "@/lib/server/http";
+import { getAuthRuntimeConfig } from "@/lib/server/auth-config";
+import {
+  authConfigurationReason,
+  getWorkOSErrorDetails,
+  logAuthEvent,
+} from "@/lib/server/auth-errors";
 
 export const runtime = "nodejs";
 
@@ -32,40 +38,53 @@ export async function GET(req: NextRequest) {
     return backToSignIn("provider");
   }
 
-  const clientId = process.env.WORKOS_CLIENT_ID;
-  const redirectUri = process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI;
-  if (!clientId || !redirectUri) {
+  let config;
+  try {
+    config = getAuthRuntimeConfig(req);
+  } catch (error) {
+    logAuthEvent("configuration_error", {
+      route: "oauth-start",
+      reason: authConfigurationReason(error),
+    });
     return backToSignIn("config");
   }
 
-  const workos = getWorkOS();
-  const pkce = await workos.pkce.generate();
-  const state = crypto.randomUUID();
+  try {
+    const workos = getWorkOS();
+    const pkce = await workos.pkce.generate();
+    const state = crypto.randomUUID();
 
-  const url = workos.userManagement.getAuthorizationUrl({
-    clientId,
-    provider,
-    redirectUri,
-    state,
-    codeChallenge: pkce.codeChallenge,
-    codeChallengeMethod: pkce.codeChallengeMethod,
-  });
-
-  const response = NextResponse.redirect(url, 302);
-  const secure = redirectUri.startsWith("https:");
-  for (const [name, value] of [
-    [OAUTH_STATE_COOKIE, state],
-    [OAUTH_VERIFIER_COOKIE, pkce.codeVerifier],
-  ] as const) {
-    response.cookies.set({
-      name,
-      value,
-      path: "/",
-      httpOnly: true,
-      sameSite: "lax",
-      secure,
-      maxAge: OAUTH_COOKIE_MAX_AGE,
+    const url = workos.userManagement.getAuthorizationUrl({
+      clientId: config.clientId,
+      provider,
+      redirectUri: config.redirectUri,
+      state,
+      codeChallenge: pkce.codeChallenge,
+      codeChallengeMethod: pkce.codeChallengeMethod,
     });
+
+    const response = NextResponse.redirect(url, 302);
+    const secure = config.publicOrigin.startsWith("https:");
+    for (const [name, value] of [
+      [OAUTH_STATE_COOKIE, state],
+      [OAUTH_VERIFIER_COOKIE, pkce.codeVerifier],
+    ] as const) {
+      response.cookies.set({
+        name,
+        value,
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure,
+        maxAge: OAUTH_COOKIE_MAX_AGE,
+      });
+    }
+    return response;
+  } catch (error) {
+    logAuthEvent("oauth_start_failed", {
+      details: getWorkOSErrorDetails(error),
+      route: "oauth-start",
+    });
+    return backToSignIn("provider");
   }
-  return response;
 }
