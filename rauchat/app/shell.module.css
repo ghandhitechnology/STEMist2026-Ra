@@ -77,3 +77,55 @@
     minmax(0, clamp(380px, 42%, 760px))
     var(--rau-telemetry-w-rail);
 }
+
+/* ---- Compact (phone) shell ----
+   Below this width there is nothing to split three ways: 264 + 320 leaves a
+   390px phone with 6px of transcript. The chat column takes the whole grid
+   and the sidebar / diagram / telemetry panels pin themselves to the viewport
+   from their own modules, so they stop consuming a track at all.
+   Keep 900px in step with the media queries in the component modules. */
+@media (max-width: 900px) {
+  .shell,
+  .shell.sidebarCollapsed,
+  .shell.telemetryCollapsed,
+  .shell.sidebarCollapsed.telemetryCollapsed,
+  .shell.withDiagram,
+  .shell.withDiagram.sidebarCollapsed,
+  .shell.withDiagram.telemetryCollapsed,
+  .shell.withDiagram.sidebarCollapsed.telemetryCollapsed {
+    grid-template-columns: minmax(0, 1fr);
+    /* 100vh measures the *large* viewport on mobile browsers, which parks the
+       composer behind the collapsing address bar. */
+    height: 100dvh;
+  }
+}
+
+/* Tap-anywhere dismissal for whichever overlay panel is open. Only rendered
+   in the compact layout; above the breakpoint the panels are in-flow columns
+   with nothing to dismiss. */
+.overlayScrim {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .overlayScrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--rau-z-modal) - 11);
+    padding: 0;
+    border: 0;
+    background: var(--rau-scrim);
+    cursor: default;
+    animation: rau-scrim-in var(--rau-dur-base) var(--rau-ease-standard) both;
+  }
+}
+
+@keyframes rau-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

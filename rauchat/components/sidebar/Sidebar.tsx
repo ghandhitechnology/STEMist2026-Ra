@@ -55,6 +55,17 @@ export type SidebarProps = {
   filesCount?: number;
   /** Keeps the parent grid track in sync with the rail/panel animation. */
   onCollapsedChange?: (collapsed: boolean) => void;
+  /**
+   * Controlled collapse. Omitted → the sidebar keeps owning the state, which
+   * is what every non-shell caller wants.
+   */
+  collapsed?: boolean;
+  /**
+   * Fired after any action that takes the user out of the sidebar (open a
+   * conversation, start one, open a panel). The compact layout renders the
+   * sidebar as an overlay drawer and uses this to close it behind them.
+   */
+  onNavigate?: () => void;
 };
 
 export function Sidebar({
@@ -70,8 +81,11 @@ export function Sidebar({
   skillsCount,
   filesCount,
   onCollapsedChange,
+  collapsed: collapsedProp,
+  onNavigate,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [ownCollapsed, setOwnCollapsed] = useState(false);
+  const collapsed = collapsedProp ?? ownCollapsed;
   const [query, setQuery] = useState("");
 
   const streamingSet = useMemo(
@@ -101,8 +115,13 @@ export function Sidebar({
 
   function handleToggleCollapsed() {
     const next = !collapsed;
-    setCollapsed(next);
+    setOwnCollapsed(next);
     onCollapsedChange?.(next);
+  }
+
+  function handleSelect(id: string) {
+    store.selectConversation(id);
+    onNavigate?.();
   }
 
   let lastGroup: string | null = null;
@@ -137,7 +156,10 @@ export function Sidebar({
         <button
           type="button"
           className={styles.newChatButton}
-          onClick={() => store.createConversation()}
+          onClick={() => {
+            store.createConversation();
+            onNavigate?.();
+          }}
         >
           <IconPlus size={16} />
           <span className={styles.newChatLabel}>New chat</span>
@@ -201,7 +223,7 @@ export function Sidebar({
                     isEntering={enteringSet.has(conversation.id)}
                     isLeaving={leavingSet.has(conversation.id)}
                     onRowAnimationEnd={store.finishRowAnimation}
-                    onSelect={store.selectConversation}
+                    onSelect={handleSelect}
                     onRename={store.renameConversation}
                     onDelete={store.deleteConversation}
                   />
@@ -212,7 +234,14 @@ export function Sidebar({
       )}
 
       <div className={styles.workspaceSection}>
-        <button type="button" className={styles.navRow} onClick={onOpenSkills}>
+        <button
+          type="button"
+          className={styles.navRow}
+          onClick={() => {
+            onOpenSkills();
+            onNavigate?.();
+          }}
+        >
           <IconSkill size={16} className={styles.navIcon} />
           <span className={styles.navLabel}>Skills</span>
           {typeof skillsCount === "number" && (
@@ -222,7 +251,10 @@ export function Sidebar({
         <button
           type="button"
           className={styles.navRow}
-          onClick={onOpenWorkspace}
+          onClick={() => {
+            onOpenWorkspace();
+            onNavigate?.();
+          }}
         >
           <IconFolder size={16} className={styles.navIcon} />
           <span className={styles.navLabel}>Workspace</span>
@@ -233,7 +265,10 @@ export function Sidebar({
         <button
           type="button"
           className={styles.navRow}
-          onClick={onOpenSettings}
+          onClick={() => {
+            onOpenSettings();
+            onNavigate?.();
+          }}
         >
           <IconGear size={16} className={styles.navIcon} />
           <span className={styles.navLabel}>Settings</span>
@@ -245,7 +280,10 @@ export function Sidebar({
           <button
             type="button"
             className={styles.accountRow}
-            onClick={onOpenAccount}
+            onClick={() => {
+              onOpenAccount();
+              onNavigate?.();
+            }}
             aria-label="Open account"
             title={account.user.email}
           >

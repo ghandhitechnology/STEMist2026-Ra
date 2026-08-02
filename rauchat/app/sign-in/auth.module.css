@@ -367,3 +367,54 @@
   color: var(--rau-text-link-hover);
   text-decoration-color: var(--rau-accent);
 }
+
+/* ---- Compact (phone) ----
+   Keep 900px in step with app/shell.module.css. */
+
+@media (max-width: 900px) {
+  .page {
+    /* 100% resolves against html's *large* viewport on mobile browsers, which
+       hides the bottom of a tall card behind the address bar. */
+    height: 100dvh;
+    padding: var(--rau-space-8) var(--rau-space-6);
+    /* Centring a flex container's overflow clips its top and makes the
+       clipped part unreachable; auto margins centre only when it fits. */
+    justify-content: flex-start;
+  }
+
+  .shell {
+    margin: auto 0;
+  }
+
+  .card {
+    padding: var(--rau-space-7) var(--rau-space-6);
+  }
+
+  /* First and last name side by side leaves ~120px per control. */
+  .nameRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 16px is the floor below which iOS Safari zooms the page on focus. */
+  .input {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .codeInput {
+    height: 52px;
+    /* Restated: the .input override above would otherwise shrink the code. */
+    font-size: var(--rau-fs-lg);
+  }
+
+  .submit,
+  .providerButton {
+    height: 44px;
+  }
+
+  .ghostRow .ghostLink {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}

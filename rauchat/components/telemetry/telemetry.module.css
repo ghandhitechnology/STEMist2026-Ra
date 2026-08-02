@@ -1101,3 +1101,46 @@
     stroke-dashoffset: 0;
   }
 }
+
+/* ---------- compact (phone) ----------
+   The instrument overlays the transcript rather than taking a column, and the
+   44px rail goes away entirely: on a 390px phone that rail is 11% of the
+   screen spent on a control the top bar already carries. Collapsed therefore
+   means "not on screen", and the panel unmounts, so there is no exit to play.
+   Keep 900px in step with app/shell.module.css. */
+
+@keyframes rau-tel-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    /* Under the modal layer (Modal.tsx portals at --rau-z-modal). */
+    z-index: calc(var(--rau-z-modal) - 10);
+    width: min(340px, 88vw);
+    /* The base height:100% over-constrains top/bottom and resolves against the
+       *large* viewport, which parks the substrate footer off screen. */
+    height: 100dvh;
+    box-shadow: var(--rau-elev-modal);
+    animation: rau-tel-drawer-in var(--rau-dur-slow) var(--rau-ease-inout) both;
+  }
+
+  .rail {
+    display: none;
+  }
+
+  /* Drag-to-resize is a pointer affordance, and the panel no longer owns a
+     grid track to resize. */
+  .resizeHandle {
+    display: none;
+  }
+}

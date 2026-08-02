@@ -489,3 +489,63 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---- Compact (phone): overlay drawer ----
+   Keep 900px in step with app/shell.module.css. */
+
+@keyframes rau-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    /* Under the modal layer (Modal.tsx portals at --rau-z-modal), above the
+       chat column and its popovers. */
+    z-index: calc(var(--rau-z-modal) - 10);
+    width: min(300px, 86vw);
+    /* The base height:100% over-constrains top/bottom and resolves against the
+       *large* viewport, which parks the account row under the address bar. */
+    height: 100dvh;
+    border-right: 1px solid var(--rau-border-default);
+    box-shadow: var(--rau-elev-modal);
+    animation: rau-drawer-in var(--rau-dur-slow) var(--rau-ease-inout) both;
+  }
+
+  /* Collapsed is off-canvas, not a rail: 56px of icons is width the
+     transcript needs, and the drawer's contents unmount on collapse anyway
+     (nothing left to slide out), so it leaves without an exit animation. */
+  .sidebarCollapsed {
+    display: none;
+  }
+
+  /* Pointer-sized rows don't survive a thumb (§4.3 sizes assume a mouse). */
+  .newChatButton,
+  .searchRow,
+  .navRow {
+    height: 44px;
+  }
+
+  .iconButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .accountRow,
+  .accountPlaceholder {
+    height: 48px;
+  }
+
+  /* 16px is the floor below which iOS Safari zooms the page on focus. */
+  .searchInput {
+    font-size: 16px;
+  }
+}

@@ -308,10 +308,17 @@
   color: var(--rau-text-tertiary);
 }
 
-/* ---- responsive: narrow viewports get the panel as an overlay ---- */
+/* ---- responsive: narrow viewports get the panel as an overlay ----
+   There is no third column to sit in below this width (app/shell.module.css
+   collapses to one), and the panel's 380px floor would otherwise push the
+   page sideways. It covers the transcript instead, like fullscreen does. */
 
 @media (max-width: 900px) {
   .panel {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--rau-z-modal) - 10);
+    height: 100dvh;
     border-left: 0;
   }
 }
