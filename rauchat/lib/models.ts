@@ -6,11 +6,19 @@
  * OpenRouter's unified `reasoning` request parameter — see
  * lib/server/openrouter.ts for the exact per-family mapping.
  *
- * NOTE: thinkingLevels below are provisional pending the OpenRouter doc
- * research pass; adjust there and here together.
+ * Thinking levels match OpenRouter's unified `reasoning.effort` scale:
+ * max | xhigh | high | medium | low | minimal | none. Locally, "off" omits
+ * the parameter (Claude) or is unused (OpenAI models start at "minimal").
  */
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 export type ModelFamily = "openai" | "anthropic" | "xai";
 
@@ -39,7 +47,7 @@ export const MODELS: ModelInfo[] = [
     shortLabel: "Sonnet 5",
     family: "anthropic",
     description: "Fast, balanced — the default.",
-    thinkingLevels: ["off", "low", "medium", "high"],
+    thinkingLevels: ["off", "low", "medium", "high", "xhigh", "max"],
     defaultThinking: "off",
   },
   {
@@ -49,7 +57,7 @@ export const MODELS: ModelInfo[] = [
     shortLabel: "Opus 5",
     family: "anthropic",
     description: "Deep reasoning and hard problems.",
-    thinkingLevels: ["off", "low", "medium", "high"],
+    thinkingLevels: ["off", "low", "medium", "high", "xhigh", "max"],
     defaultThinking: "medium",
   },
   {
@@ -59,7 +67,7 @@ export const MODELS: ModelInfo[] = [
     shortLabel: "Sol",
     family: "openai",
     description: "OpenAI's flagship generalist.",
-    thinkingLevels: ["minimal", "low", "medium", "high"],
+    thinkingLevels: ["minimal", "low", "medium", "high", "xhigh", "max"],
     defaultThinking: "medium",
   },
   {
@@ -69,7 +77,7 @@ export const MODELS: ModelInfo[] = [
     shortLabel: "Luna",
     family: "openai",
     description: "Fast and light; also names your chats.",
-    thinkingLevels: ["minimal", "low", "medium", "high"],
+    thinkingLevels: ["minimal", "low", "medium", "high", "xhigh", "max"],
     defaultThinking: "low",
   },
   {
@@ -79,7 +87,7 @@ export const MODELS: ModelInfo[] = [
     shortLabel: "Terra",
     family: "openai",
     description: "Long-horizon reasoning specialist.",
-    thinkingLevels: ["minimal", "low", "medium", "high", "xhigh"],
+    thinkingLevels: ["minimal", "low", "medium", "high", "xhigh", "max"],
     defaultThinking: "medium",
   },
   {
