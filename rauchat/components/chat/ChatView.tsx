@@ -119,7 +119,15 @@ export const ChatView = memo(function ChatView({
   const wasStreaming = useRef(false);
 
   const messages = conversation?.messages ?? [];
-  const { isStreaming, content, toolEvents, error } = streamingState;
+  // `thinking` (the prop) is the reasoning-effort level; `streamThinking` is
+  // the live reasoning trace for the in-flight turn.
+  const {
+    isStreaming,
+    content,
+    toolEvents,
+    error,
+    thinking: streamThinking,
+  } = streamingState;
 
   // Stamp the in-flight turn once, when it starts.
   if (isStreaming && !wasStreaming.current) turnStartedAt.current = Date.now();
@@ -140,10 +148,11 @@ export const ChatView = memo(function ChatView({
             role: "assistant",
             content,
             createdAt: turnStartedAt.current,
+            thinking: streamThinking || undefined,
             toolEvents,
           }
         : null,
-    [showStreamingTurn, content, toolEvents]
+    [showStreamingTurn, content, streamThinking, toolEvents]
   );
 
   const handleSuggestion = useCallback((text: string) => {

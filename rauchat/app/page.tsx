@@ -360,6 +360,7 @@ export default function Home() {
         role: "assistant",
         content: msg.content,
         createdAt: Date.now(),
+        thinking: msg.thinking || undefined,
         toolEvents: msg.toolEvents.length ? msg.toolEvents : undefined,
         traitSnapshot: msg.traitSnapshot ?? undefined,
       };

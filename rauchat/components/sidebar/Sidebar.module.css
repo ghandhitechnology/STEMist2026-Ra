@@ -25,12 +25,13 @@
 
 .header {
   height: var(--rau-topbar-h);
-  padding: 0 12px 0 16px;
+  padding: 0 12px 0 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--rau-border-faint);
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .sidebarCollapsed .header {
@@ -41,7 +42,7 @@
 .wordmark {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-family: var(--rau-font-sans);
   font-weight: 590;
   font-size: 15px;
@@ -51,8 +52,13 @@
   cursor: default;
 }
 
-.wordmarkRau {
-  color: var(--rau-text-primary);
+.wordmarkMark {
+  display: block;
+  height: 34px;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  user-select: none;
 }
 
 .wordmarkChat {
@@ -62,25 +68,6 @@
 
 .header:hover .wordmarkChat {
   color: var(--rau-text-secondary);
-}
-
-.notch {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--rau-border-default);
-  border-radius: 2px;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.notch::after {
-  content: "";
-  position: absolute;
-  left: 2px;
-  bottom: 2px;
-  width: 4px;
-  height: 4px;
-  background: var(--rau-accent);
 }
 
 .iconButton {

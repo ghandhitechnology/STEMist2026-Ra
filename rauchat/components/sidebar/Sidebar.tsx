@@ -112,8 +112,14 @@ export function Sidebar({
       <div className={styles.header}>
         {!collapsed && (
           <div className={styles.wordmark}>
-            <span className={styles.notch} />
-            <span className={styles.wordmarkRau}>Rau</span>
+            <img
+              className={styles.wordmarkMark}
+              src="/brand/rau-mark.png?v=2"
+              alt="Rau"
+              width={44}
+              height={40}
+              draggable={false}
+            />
             <span className={styles.wordmarkChat}>chat</span>
           </div>
         )}

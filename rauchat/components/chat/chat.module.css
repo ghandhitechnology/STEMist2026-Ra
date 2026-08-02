@@ -1047,6 +1047,143 @@
   line-height: var(--rau-lh-mini);
   color: var(--rau-text-tertiary);
 }
+
+/* ------------------------------------------------------------
+   Reasoning disclosure — "Thinking" at the top of the assistant turn,
+   under the header row. Header is a quiet text button with a rotating
+   chevron; the body (reasoning trace + working tool cards) expands via
+   grid-template-rows like §7 cards.
+   ------------------------------------------------------------ */
+
+.reasoning {
+  margin-bottom: var(--rau-space-4);
+  animation: cardEnter var(--rau-dur-base) var(--rau-ease-standard);
+}
+.reasoningHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rau-space-2);
+  height: 24px;
+  padding: 0 var(--rau-space-3) 0 var(--rau-space-2);
+  margin-left: calc(-1 * var(--rau-space-2));
+  border: 0;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard);
+}
+.reasoningHeader:hover {
+  background: var(--rau-fill-hover);
+}
+.reasoningChevron {
+  display: flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--rau-text-quaternary);
+  transform: rotate(-90deg);
+  transition: transform var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.reasoningChevronOpen {
+  transform: rotate(0deg);
+}
+.reasoningLabel {
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-tertiary);
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.reasoningHeader:hover .reasoningLabel {
+  color: var(--rau-text-secondary);
+}
+/* Live turn: a light sheen sweeps the label while reasoning streams. */
+.reasoningLabelActive {
+  background: linear-gradient(
+    90deg,
+    var(--rau-text-tertiary) 30%,
+    var(--rau-text-primary) 50%,
+    var(--rau-text-tertiary) 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: reasoningSheen 2200ms linear infinite;
+}
+@keyframes reasoningSheen {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.reasoningCount {
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--rau-text-quaternary);
+}
+.reasoningGrid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--rau-dur-base) var(--rau-ease-standard);
+}
+.reasoningGridOpen {
+  grid-template-rows: 1fr;
+}
+.reasoningClip {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 130ms var(--rau-ease-standard) 40ms;
+}
+.reasoningGridOpen > .reasoningClip {
+  opacity: 1;
+}
+.reasoningBody {
+  margin-top: var(--rau-space-3);
+  padding-left: var(--rau-space-5);
+  border-left: 2px solid var(--rau-border-subtle);
+}
+.reasoningText {
+  max-height: 260px;
+  overflow-y: auto;
+}
+/* Reasoning renders as real markdown, but muted and one step smaller than
+   the reply — and with headings tamed to body scale so a trace that uses
+   `#` never shouts louder than the answer itself. */
+.reasoningProse {
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-xs);
+  color: var(--rau-text-tertiary);
+}
+.reasoningProse p,
+.reasoningProse ul,
+.reasoningProse ol {
+  margin-bottom: var(--rau-space-4);
+}
+.reasoningProse h1,
+.reasoningProse h2,
+.reasoningProse h3,
+.reasoningProse h4,
+.reasoningProse h5,
+.reasoningProse h6 {
+  margin: var(--rau-space-5) 0 var(--rau-space-2);
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  font-weight: var(--rau-fw-semibold);
+  letter-spacing: var(--rau-ls-snug);
+}
+.reasoningProse strong {
+  color: var(--rau-text-secondary);
+}
 .cardErrorBody {
   padding: var(--rau-space-4) var(--rau-space-5);
   background: var(--rau-danger-surface);
@@ -1992,7 +2129,13 @@
     animation: none;
   }
   .card,
-  .popover {
+  .popover,
+  .reasoning {
     animation: none;
+  }
+  .reasoningLabelActive {
+    animation: none;
+    background: none;
+    color: var(--rau-text-secondary);
   }
 }

@@ -126,6 +126,8 @@ export type Message = {
   createdAt: number;
   /** Files attached to this user turn (workspace uploads). */
   attachments?: MessageAttachment[];
+  /** Model reasoning trace (or provider summary) captured for this assistant turn. */
+  thinking?: string;
   toolEvents?: ToolEvent[];
   traitSnapshot?: TraitSnapshot;
 };

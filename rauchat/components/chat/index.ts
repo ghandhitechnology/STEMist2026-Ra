@@ -9,6 +9,9 @@ export type { MessageListProps } from "./MessageList";
 export { MessageItem } from "./MessageItem";
 export type { MessageItemProps, MessageActions } from "./MessageItem";
 
+export { ThinkingSection } from "./ThinkingSection";
+export type { ThinkingSectionProps } from "./ThinkingSection";
+
 export { Markdown, CodeBlock } from "./Markdown";
 export type { MarkdownProps } from "./Markdown";
 

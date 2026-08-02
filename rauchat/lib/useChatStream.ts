@@ -28,6 +28,8 @@ import type {
 
 export type StreamingMessage = {
   content: string;
+  /** Accumulated model reasoning ("thinking") deltas for the turn. */
+  thinking: string;
   toolEvents: ToolEvent[];
   traitSnapshot: TraitSnapshot | null;
 };
@@ -35,12 +37,11 @@ export type StreamingMessage = {
 export type StreamingState = StreamingMessage & {
   isStreaming: boolean;
   error: string | null;
-  /** Accumulated model reasoning ("thinking") deltas for the in-flight turn. */
-  thinking: string;
 };
 
 export const EMPTY_STREAMING_MESSAGE: StreamingMessage = {
   content: "",
+  thinking: "",
   toolEvents: [],
   traitSnapshot: null,
 };
@@ -49,7 +50,6 @@ export const EMPTY_STREAMING_STATE: StreamingState = {
   ...EMPTY_STREAMING_MESSAGE,
   isStreaming: false,
   error: null,
-  thinking: "",
 };
 
 export type SendInput = {
@@ -185,7 +185,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(
     null
   );
-  const [streamingThinking, setStreamingThinking] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -195,7 +194,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
 
   const abortRef = useRef<AbortController | null>(null);
   const bufferRef = useRef<StreamingMessage>(EMPTY_STREAMING_MESSAGE);
-  const thinkingRef = useRef<string>("");
   const frameRef = useRef<number | null>(null);
 
   const cancelFlush = useCallback(() => {
@@ -207,7 +205,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
 
   const commit = useCallback(() => {
     setStreamingMessage({ ...bufferRef.current });
-    setStreamingThinking(thinkingRef.current);
   }, []);
 
   /** Coalesce high-frequency updates into one commit per frame. */
@@ -234,9 +231,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
   const reset = useCallback(() => {
     cancelFlush();
     bufferRef.current = EMPTY_STREAMING_MESSAGE;
-    thinkingRef.current = "";
     setStreamingMessage(null);
-    setStreamingThinking("");
     setError(null);
   }, [cancelFlush]);
 
@@ -255,10 +250,13 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
       abortRef.current = controller;
 
       cancelFlush();
-      bufferRef.current = { content: "", toolEvents: [], traitSnapshot: null };
-      thinkingRef.current = "";
+      bufferRef.current = {
+        content: "",
+        thinking: "",
+        toolEvents: [],
+        traitSnapshot: null,
+      };
       setStreamingMessage(bufferRef.current);
-      setStreamingThinking("");
       setError(null);
       setIsStreaming(true);
 
@@ -336,7 +334,10 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
             case "thinking": {
               const delta = parseTextDelta(frame.data);
               if (!delta) return;
-              thinkingRef.current += delta;
+              bufferRef.current = {
+                ...bufferRef.current,
+                thinking: bufferRef.current.thinking + delta,
+              };
               handlers.current.onThinking?.(delta);
               scheduleFlush();
               return;
@@ -407,7 +408,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
         cancelFlush();
         const final = { ...bufferRef.current };
         setStreamingMessage(final);
-        setStreamingThinking(thinkingRef.current);
         setIsStreaming(false);
 
         if (status.error) {
@@ -441,11 +441,11 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
 
   const state: StreamingState = {
     content: streamingMessage?.content ?? "",
+    thinking: streamingMessage?.thinking ?? "",
     toolEvents: streamingMessage?.toolEvents ?? EMPTY_STREAMING_MESSAGE.toolEvents,
     traitSnapshot: streamingMessage?.traitSnapshot ?? null,
     isStreaming,
     error,
-    thinking: streamingThinking,
   };
 
   return {
@@ -453,7 +453,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
     stop,
     isStreaming,
     streamingMessage,
-    streamingThinking,
+    streamingThinking: streamingMessage?.thinking ?? "",
     error,
     state,
     reset,
