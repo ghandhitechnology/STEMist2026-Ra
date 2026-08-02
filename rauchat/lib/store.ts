@@ -15,6 +15,32 @@ import type { Conversation, Message } from "./types";
  */
 export const STORAGE_KEY_PREFIX = "rauchat.conversations.v1";
 
+/** The name a conversation carries until Luna renames it (lib/useAutoTitle.ts). */
+export const DEFAULT_CONVERSATION_TITLE = "New chat";
+
+/**
+ * "Untouched" = nothing was ever said in it AND it still carries the default
+ * name. These are scratch rows, not history: at most one exists at a time
+ * (see `createConversation`), the user navigating away sweeps it, and it is
+ * never written to localStorage.
+ */
+export function isUntouchedConversation(conversation: Conversation): boolean {
+  return (
+    conversation.messages.length === 0 &&
+    conversation.title === DEFAULT_CONVERSATION_TITLE
+  );
+}
+
+/**
+ * Fallbacks for the sidebar row pop animations. A row that is never on screen
+ * (collapsed sidebar, filtered out by search) fires no `animationend`, so
+ * every pop is also on a timer — a swept conversation must disappear whether
+ * or not anyone watched it go. Keep these above the matching durations in
+ * components/sidebar/ConversationItem.module.css.
+ */
+const ROW_ENTER_FALLBACK_MS = 420;
+const ROW_LEAVE_FALLBACK_MS = 280;
+
 function storageKeyFor(userId: string): string {
   return `${STORAGE_KEY_PREFIX}:${userId}`;
 }
@@ -102,6 +128,24 @@ export type UseConversations = {
   activeId: string | null;
   /** True once localStorage has been read on the client. */
   hydrated: boolean;
+  /** Ids whose sidebar row should play its pop-in (created this session). */
+  enteringIds: string[];
+  /**
+   * Ids playing their pop-out. They are still in `conversations` — the row
+   * animates first and is dropped from state by `finishRowAnimation`.
+   */
+  leavingIds: string[];
+  /**
+   * Called by a row when a pop animation ends (or is skipped). Idempotent:
+   * the two-part animation fires it twice, and the fallback timer may beat
+   * both.
+   */
+  finishRowAnimation: (id: string) => void;
+  /**
+   * Creates a conversation and selects it. With the default title this
+   * reuses an existing untouched conversation instead of stacking another
+   * blank row; a custom title (a branch) always makes a new one.
+   */
   createConversation: (title?: string) => Conversation;
   selectConversation: (id: string | null) => void;
   deleteConversation: (id: string) => void;
@@ -136,6 +180,109 @@ export function useConversations(userId: string | null): UseConversations {
   // The account whose conversations are currently in state.
   const loadedFor = useRef<string | null>(null);
 
+  // Mirrors of the two pieces of state that callbacks have to read *now* —
+  // dedupe and the untouched sweep both decide inside an event handler, one
+  // render before the state they depend on would reach them.
+  const conversationsRef = useRef<Conversation[]>([]);
+  const activeIdRef = useRef<string | null>(null);
+
+  /** Every write goes through here so `conversationsRef` can never drift. */
+  const updateConversations = useCallback(
+    (updater: (prev: Conversation[]) => Conversation[]) => {
+      setConversations((prev) => {
+        const next = updater(prev);
+        conversationsRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
+  const commitActiveId = useCallback((id: string | null) => {
+    activeIdRef.current = id;
+    setActiveId(id);
+  }, []);
+
+  // --- Sidebar row pop lifecycle -------------------------------------------
+  // The sets are the source of truth (a row's two animations both end in the
+  // same tick, before any re-render); the arrays are what renders.
+  const [enteringIds, setEnteringIds] = useState<string[]>([]);
+  const [leavingIds, setLeavingIds] = useState<string[]>([]);
+  const enteringRef = useRef<Set<string>>(new Set());
+  const leavingRef = useRef<Set<string>>(new Set());
+  const rowTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  const clearRowTimer = useCallback((id: string) => {
+    const timer = rowTimers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      rowTimers.current.delete(id);
+    }
+  }, []);
+
+  const finishRowAnimationRef = useRef<(id: string) => void>(() => {});
+
+  const finishRowAnimation = useCallback(
+    (id: string) => {
+      clearRowTimer(id);
+      if (enteringRef.current.delete(id)) {
+        setEnteringIds((prev) => prev.filter((x) => x !== id));
+      }
+      if (!leavingRef.current.delete(id)) return;
+      setLeavingIds((prev) => prev.filter((x) => x !== id));
+      // A message that landed while the row was animating out cancels the
+      // sweep — the conversation stopped being scratch space.
+      const target = conversationsRef.current.find((c) => c.id === id);
+      if (target && isUntouchedConversation(target)) {
+        updateConversations((prev) => prev.filter((c) => c.id !== id));
+        if (activeIdRef.current === id) commitActiveId(null);
+      }
+    },
+    [clearRowTimer, commitActiveId, updateConversations]
+  );
+  finishRowAnimationRef.current = finishRowAnimation;
+
+  const scheduleRowTimer = useCallback(
+    (id: string, ms: number) => {
+      clearRowTimer(id);
+      rowTimers.current.set(
+        id,
+        setTimeout(() => finishRowAnimationRef.current(id), ms)
+      );
+    },
+    [clearRowTimer]
+  );
+
+  /** Marks a just-created row so it pops in — nothing else ever animates. */
+  const startRowEnter = useCallback(
+    (id: string) => {
+      enteringRef.current.add(id);
+      setEnteringIds((prev) => [...prev, id]);
+      scheduleRowTimer(id, ROW_ENTER_FALLBACK_MS);
+    },
+    [scheduleRowTimer]
+  );
+
+  /** Marks a doomed row so it pops out; deletion happens when it lands. */
+  const startRowLeave = useCallback(
+    (id: string) => {
+      if (leavingRef.current.has(id)) return;
+      leavingRef.current.add(id);
+      setLeavingIds((prev) => [...prev, id]);
+      scheduleRowTimer(id, ROW_LEAVE_FALLBACK_MS);
+    },
+    [scheduleRowTimer]
+  );
+
+  // Pending pops die with the component; nothing may fire after unmount.
+  useEffect(() => {
+    const timers = rowTimers.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
   // Hydrate on mount and whenever the signed-in account changes.
   useEffect(() => {
     if (!userId) return;
@@ -148,81 +295,149 @@ export function useConversations(userId: string | null): UseConversations {
       // First hydration. The account arrives one fetch after mount, so the
       // user may already have started a conversation — keep it rather than
       // replacing state out from under them.
-      setConversations((pending) => {
+      updateConversations((pending) => {
         if (!pending.length) return stored;
         const stored_ids = new Set(stored.map((c) => c.id));
         return [...pending.filter((c) => !stored_ids.has(c.id)), ...stored];
       });
     } else {
       // A genuinely different account: replace wholesale, select nothing.
-      setConversations(stored);
-      setActiveId(null);
+      // Any pop in flight belonged to the previous account's rows.
+      for (const timer of rowTimers.current.values()) clearTimeout(timer);
+      rowTimers.current.clear();
+      enteringRef.current.clear();
+      leavingRef.current.clear();
+      setEnteringIds([]);
+      setLeavingIds([]);
+      updateConversations(() => stored);
+      commitActiveId(null);
     }
     setHydrated(true);
-  }, [userId]);
+  }, [userId, updateConversations, commitActiveId]);
 
   // Persist on every change, but only into the account we hydrated from.
+  // Untouched conversations are deliberately left out: a blank "New chat"
+  // is session scratch space and must not come back after a reload. The one
+  // on screen still lives in React state, so the session is unaffected.
   useEffect(() => {
     if (!userId || loadedFor.current !== userId) return;
-    saveConversations(userId, conversations);
+    saveConversations(
+      userId,
+      conversations.filter((c) => !isUntouchedConversation(c))
+    );
   }, [userId, conversations]);
 
-  const createConversation = useCallback((title = "New chat"): Conversation => {
-    const now = Date.now();
-    const conversation: Conversation = {
-      id: generateId(),
-      title,
-      createdAt: now,
-      updatedAt: now,
-      messages: [],
-    };
-    setConversations((prev) => [conversation, ...prev]);
-    setActiveId(conversation.id);
-    return conversation;
-  }, []);
+  const createConversation = useCallback(
+    (title = DEFAULT_CONVERSATION_TITLE): Conversation => {
+      // Repeated "New chat" clicks must not pile up identical blank rows:
+      // the untouched one already on screen *is* the new chat. Only the
+      // default-title path dedupes — a branch names itself and always gets a
+      // conversation of its own.
+      if (title === DEFAULT_CONVERSATION_TITLE) {
+        const existing = conversationsRef.current.find(
+          (c) => isUntouchedConversation(c) && !leavingRef.current.has(c.id)
+        );
+        if (existing) {
+          // Already active → genuinely nothing happens.
+          if (activeIdRef.current !== existing.id) commitActiveId(existing.id);
+          return existing;
+        }
+      }
+      // Creating a differently-named conversation (a branch) is also
+      // navigating away, so it sweeps an untouched chat just like a
+      // selection does. The default path never gets here with one open —
+      // the dedupe above already returned it.
+      const previousId = activeIdRef.current;
+      if (previousId) {
+        const previous = conversationsRef.current.find(
+          (c) => c.id === previousId
+        );
+        if (previous && isUntouchedConversation(previous)) {
+          startRowLeave(previous.id);
+        }
+      }
 
-  const selectConversation = useCallback((id: string | null) => {
-    setActiveId(id);
-  }, []);
+      const now = Date.now();
+      const conversation: Conversation = {
+        id: generateId(),
+        title,
+        createdAt: now,
+        updatedAt: now,
+        messages: [],
+      };
+      updateConversations((prev) => [conversation, ...prev]);
+      commitActiveId(conversation.id);
+      startRowEnter(conversation.id);
+      return conversation;
+    },
+    [commitActiveId, startRowEnter, startRowLeave, updateConversations]
+  );
 
-  const deleteConversation = useCallback((id: string) => {
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    setActiveId((current) => (current === id ? null : current));
-  }, []);
+  const selectConversation = useCallback(
+    (id: string | null) => {
+      // Navigating off an untouched conversation sweeps it — it was never
+      // used, and a lingering blank row is exactly what piled the sidebar
+      // up. The row pops out first; `finishRowAnimation` deletes it.
+      const previousId = activeIdRef.current;
+      if (previousId && previousId !== id) {
+        const previous = conversationsRef.current.find(
+          (c) => c.id === previousId
+        );
+        if (previous && isUntouchedConversation(previous)) {
+          startRowLeave(previous.id);
+        }
+      }
+      commitActiveId(id);
+    },
+    [commitActiveId, startRowLeave]
+  );
+
+  const deleteConversation = useCallback(
+    (id: string) => {
+      clearRowTimer(id);
+      enteringRef.current.delete(id);
+      leavingRef.current.delete(id);
+      setEnteringIds((prev) => prev.filter((x) => x !== id));
+      setLeavingIds((prev) => prev.filter((x) => x !== id));
+      updateConversations((prev) => prev.filter((c) => c.id !== id));
+      if (activeIdRef.current === id) commitActiveId(null);
+    },
+    [clearRowTimer, commitActiveId, updateConversations]
+  );
 
   // Title changes deliberately leave updatedAt alone — the sidebar sorts by
   // updatedAt, and renaming a chat must not move it in the list.
   const renameConversation = useCallback((id: string, title: string) => {
-    setConversations((prev) =>
+    updateConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, title } : c))
     );
-  }, []);
+  }, [updateConversations]);
 
   const setConversationModel = useCallback(
     (id: string, modelId: string, thinking: string) => {
-      setConversations((prev) =>
+      updateConversations((prev) =>
         prev.map((c) =>
           c.id === id ? { ...c, modelId, thinking, updatedAt: Date.now() } : c
         )
       );
     },
-    []
+    [updateConversations]
   );
 
   const setConversationTitleMeta = useCallback(
     (id: string, title: string, titledAtCount: number) => {
-      setConversations((prev) =>
+      updateConversations((prev) =>
         prev.map((c) =>
           c.id === id ? { ...c, title, titledAtCount } : c
         )
       );
     },
-    []
+    [updateConversations]
   );
 
   const appendMessage = useCallback(
     (conversationId: string, message: Message) => {
-      setConversations((prev) =>
+      updateConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId
             ? {
@@ -234,12 +449,12 @@ export function useConversations(userId: string | null): UseConversations {
         )
       );
     },
-    []
+    [updateConversations]
   );
 
   const updateMessage = useCallback(
     (conversationId: string, messageId: string, patch: Partial<Message>) => {
-      setConversations((prev) =>
+      updateConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId
             ? {
@@ -253,12 +468,12 @@ export function useConversations(userId: string | null): UseConversations {
         )
       );
     },
-    []
+    [updateConversations]
   );
 
   const replaceMessages = useCallback(
     (conversationId: string, messages: Message[]) => {
-      setConversations((prev) =>
+      updateConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId
             ? { ...c, messages, updatedAt: Date.now() }
@@ -266,7 +481,7 @@ export function useConversations(userId: string | null): UseConversations {
         )
       );
     },
-    []
+    [updateConversations]
   );
 
   const sorted = [...conversations].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -278,6 +493,9 @@ export function useConversations(userId: string | null): UseConversations {
     activeConversation,
     activeId,
     hydrated,
+    enteringIds,
+    leavingIds,
+    finishRowAnimation,
     createConversation,
     selectConversation,
     deleteConversation,

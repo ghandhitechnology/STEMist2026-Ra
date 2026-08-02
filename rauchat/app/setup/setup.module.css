@@ -19,6 +19,15 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
+
+  /* Onboarding is the one place that runs longer than the §5.1 240ms budget:
+     these are whole-screen state swaps (shell → form → leaving), not in-app
+     interactions, and each happens at most once per account. The easing is a
+     plain decel — no overshoot, per §2.11. */
+  --rau-setup-enter: 380ms;
+  --rau-setup-fade: 300ms;
+  --rau-setup-exit: 240ms;
+  --rau-setup-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .wordmark {
@@ -59,6 +68,82 @@
 
 .wordmarkChat {
   color: var(--rau-text-tertiary);
+}
+
+/* ---- State swap (§5, see the note on .card) ----
+
+   The card and its wordmark stay mounted for the whole of onboarding; only
+   .bodyInner is re-keyed per state. So .body carries the height — page.tsx
+   measures the live content and writes it here, which turns "shell → form"
+   from a jump into a glide. Height is on the §5.2 allowlist for container
+   resize; `clip` rather than `hidden` so the submit button's 2px focus ring
+   is not shaved off at the bottom edge. */
+
+.body {
+  width: 100%;
+  overflow: clip;
+  overflow-clip-margin: 4px;
+  transition: height var(--rau-setup-enter) var(--rau-setup-ease);
+}
+
+/* The zoom belongs to the block as a whole… (the column mirrors .card's own
+   centering, which .bodyInner now stands between) */
+.bodyInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 25%;
+  animation: setupZoomIn var(--rau-setup-enter) var(--rau-setup-ease) both;
+}
+
+/* …and the fade is staggered across its top-level children, so the heading
+   settles a beat before the fields. Two steps only — this is a one-time
+   welcome, not the list load §5.5 forbids staggering. */
+.bodyInner > * {
+  animation: setupFadeIn var(--rau-setup-fade) var(--rau-setup-ease) both;
+}
+
+.bodyInner > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.bodyInner > *:nth-child(n + 3) {
+  animation-delay: 90ms;
+}
+
+/* Exit frame played after PUT /api/profile lands, before the hard navigation
+   to "/". Pushing away rather than sliding out reads as "going in". */
+.cardLeaving {
+  animation: setupCardExit var(--rau-setup-exit) var(--rau-ease-exit) both;
+}
+
+@keyframes setupZoomIn {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes setupFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes setupCardExit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.02);
+  }
 }
 
 .heading {
@@ -223,4 +308,29 @@
 .retry {
   margin-top: 0;
   padding: 0 14px;
+}
+
+/* ------------------------------------------------------------
+   Reduced motion (§5.6) — every state must still arrive, just
+   without the zoom, the stagger, or the height glide. The global
+   rule already caps durations; the delays and the transform are
+   what have to go. page.tsx skips the exit wait to match.
+   ------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .body {
+    transition: none;
+  }
+  .bodyInner {
+    animation: none;
+  }
+  .bodyInner > *,
+  .bodyInner > *:nth-child(2),
+  .bodyInner > *:nth-child(n + 3) {
+    animation-delay: 0ms;
+  }
+  .cardLeaving {
+    animation: none;
+    opacity: 0;
+  }
 }

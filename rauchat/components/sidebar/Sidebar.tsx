@@ -85,6 +85,14 @@ export function Sidebar({
     [streamingConversationIds]
   );
 
+  // Row pop lifecycle lives in the store (it owns the delete that follows a
+  // pop-out); the sidebar only reports which rows are mid-animation.
+  const enteringSet = useMemo(
+    () => new Set(store.enteringIds),
+    [store.enteringIds]
+  );
+  const leavingSet = useMemo(() => new Set(store.leavingIds), [store.leavingIds]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return store.conversations;
@@ -222,6 +230,9 @@ export function Sidebar({
                     isStreaming={streamingSet.has(conversation.id)}
                     titleAnimate={titleAnimations?.[conversation.id] ?? "none"}
                     onTitleAnimationEnd={onTitleAnimationEnd}
+                    isEntering={enteringSet.has(conversation.id)}
+                    isLeaving={leavingSet.has(conversation.id)}
+                    onRowAnimationEnd={store.finishRowAnimation}
                     onSelect={store.selectConversation}
                     onRename={store.renameConversation}
                     onDelete={store.deleteConversation}
