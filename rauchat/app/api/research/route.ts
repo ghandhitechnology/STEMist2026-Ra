@@ -18,6 +18,7 @@ import type OpenAI from "openai";
 import { z } from "zod";
 import type { ToolEvent } from "@/lib/types";
 import { getUserId, unauthorized } from "@/lib/server/auth";
+import { consumeRateLimit } from "@/lib/server/ratelimit";
 import { getModel } from "@/lib/models";
 import { createSSEResponse } from "@/lib/server/sse";
 import { getOpenRouter } from "@/lib/server/openrouter";
@@ -39,7 +40,12 @@ function formatResults(results: WebSearchResult[]): string {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await getUserId())) return unauthorized();
+  const userId = await getUserId();
+  if (!userId) return unauthorized();
+  const allowance = await consumeRateLimit(userId, "research");
+  if (!allowance.ok) {
+    return Response.json({ error: allowance.message }, { status: 429 });
+  }
   let body: unknown;
   try {
     body = await req.json();
