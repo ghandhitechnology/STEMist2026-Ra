@@ -554,7 +554,7 @@ function SkillBody({ event, onInstallSkill }: BodyProps) {
   );
 }
 
-function SvgRenderBody({ event }: BodyProps) {
+function SvgRenderBody({ event }: { event: ToolEvent }) {
   if (event.status === "running") return <Shimmer rows={3} />;
 
   const rec = asRec(event.result);

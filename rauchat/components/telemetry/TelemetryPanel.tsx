@@ -22,8 +22,14 @@ import {
 } from "@/lib/types";
 import { ConnectionCard } from "./ConnectionCard";
 import { TraitAxis } from "./TraitAxis";
+import { TraitRadar } from "./TraitRadar";
 import { TraitHistory } from "./TraitHistory";
-import { ChevronLeftIcon, ChevronRightIcon } from "./icons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PolygonIcon,
+  RowsIcon,
+} from "./icons";
 import s from "./telemetry.module.css";
 
 export type TelemetryPanelProps = {
@@ -57,6 +63,9 @@ const TRAIT_ORDER: TraitId[] = [
   "calm",
 ];
 
+/** Three axes summarised by the hexagon radar (bars keep all eight). */
+const RADAR_TRAITS: TraitId[] = ["factual", "honest", "calm"];
+
 type AxisState = {
   score: number | null;
   confidence: number;
@@ -70,6 +79,10 @@ const EMPTY_AXIS: AxisState = {
   delta: null,
   stale: false,
 };
+
+/** Which reading of section B is on screen (§6.2). Persisted per browser. */
+type AxisView = "bars" | "radar";
+const AXIS_VIEW_KEY = "rauchat:telemetry-axis-view";
 
 export function TelemetryPanel({
   status,
@@ -90,6 +103,30 @@ export function TelemetryPanel({
   const { axes, latestTurn, reportingAxes } = useMemo(
     () => deriveAxes(snapshots, status),
     [snapshots, status],
+  );
+
+  const [axisView, setAxisView] = useState<AxisView>("bars");
+  useEffect(() => {
+    const stored = window.localStorage.getItem(AXIS_VIEW_KEY);
+    if (stored === "bars" || stored === "radar") setAxisView(stored);
+  }, []);
+  const selectAxisView = (next: AxisView) => {
+    setAxisView(next);
+    try {
+      window.localStorage.setItem(AXIS_VIEW_KEY, next);
+    } catch {
+      // Private-mode storage failures are not worth surfacing.
+    }
+  };
+
+  const radarData = useMemo(
+    () =>
+      RADAR_TRAITS.map((traitId) => ({
+        traitId,
+        score: axes[traitId].score,
+        stale: axes[traitId].stale,
+      })),
+    [axes],
   );
 
   // §6.6 — on the first turn that lands, stubs expand staggered by row index.
@@ -164,6 +201,7 @@ export function TelemetryPanel({
         <section className={s.section} aria-label="Trait axes">
           <div className={s.sectionLabelRow}>
             <h3 className={s.sectionLabel}>Trait axes</h3>
+            <AxisViewSwitch view={axisView} onSelect={selectAxisView} />
           </div>
 
           {status === "live" && hasData && reportingAxes < TRAIT_ORDER.length ? (
@@ -172,23 +210,27 @@ export function TelemetryPanel({
             </p>
           ) : null}
 
-          <div className={s.axisList}>
-            {TRAIT_ORDER.map((traitId, i) => {
-              const a = axes[traitId];
-              return (
-                <TraitAxis
-                  key={traitId}
-                  traitId={traitId}
-                  score={a.score}
-                  confidence={a.confidence}
-                  delta={a.delta}
-                  stale={a.stale}
-                  dormant={dormant}
-                  revealDelayMs={revealing ? i * 24 : 0}
-                />
-              );
-            })}
-          </div>
+          {axisView === "radar" ? (
+            <TraitRadar data={radarData} dormant={dormant} />
+          ) : (
+            <div className={s.axisList}>
+              {TRAIT_ORDER.map((traitId, i) => {
+                const a = axes[traitId];
+                return (
+                  <TraitAxis
+                    key={traitId}
+                    traitId={traitId}
+                    score={a.score}
+                    confidence={a.confidence}
+                    delta={a.delta}
+                    stale={a.stale}
+                    dormant={dormant}
+                    revealDelayMs={revealing ? i * 24 : 0}
+                  />
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section className={s.section}>
@@ -207,6 +249,82 @@ export function TelemetryPanel({
         <SubstrateSlot layerInfo={layerInfo} vectorSet={vectorSet} />
       </div>
     </aside>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* B — axis view switch (§6.2)                                          */
+/* ------------------------------------------------------------------ */
+
+const AXIS_VIEWS: Array<{
+  id: AxisView;
+  label: string;
+  Icon: typeof RowsIcon;
+}> = [
+  { id: "bars", label: "Bars", Icon: RowsIcon },
+  { id: "radar", label: "Radar", Icon: PolygonIcon },
+];
+
+/**
+ * A single quiet affordance that expands in place into the two readings —
+ * closed it is just the current mode's glyph, so the label row stays calm.
+ */
+function AxisViewSwitch({
+  view,
+  onSelect,
+}: {
+  view: AxisView;
+  onSelect: (next: AxisView) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = AXIS_VIEWS.find((v) => v.id === view) ?? AXIS_VIEWS[0];
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className={s.viewSwitchTrigger}
+        onClick={() => setOpen(true)}
+        aria-expanded={false}
+        aria-label={`Axis view: ${current.label}. Change view`}
+        title={`Axis view: ${current.label}`}
+      >
+        <current.Icon size={12} />
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className={s.viewSwitch}
+      role="group"
+      aria-label="Axis view"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setOpen(false);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setOpen(false);
+      }}
+    >
+      {AXIS_VIEWS.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          autoFocus={id === view}
+          className={`${s.viewSwitchOption} ${id === view ? s.viewSwitchOptionOn : ""}`}
+          onClick={() => {
+            onSelect(id);
+            setOpen(false);
+          }}
+          aria-pressed={id === view}
+        >
+          <Icon size={12} />
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 

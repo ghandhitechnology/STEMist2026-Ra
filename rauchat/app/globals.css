@@ -74,6 +74,10 @@
   --rau-tel-dormant:      #232328; /* bar rendered when no data exists */
   --rau-tel-spark:        #6D6D76;
   --rau-tel-spark-head:   #E8A33D;
+  /* Hexagon radar wash — dark red ↔ mid ↔ dark green (via color-mix). */
+  --rau-tel-radar-neg:    #7A2F33; /* negative poles dominate */
+  --rau-tel-radar-mid:    #4A4A52; /* balanced */
+  --rau-tel-radar-pos:    #2F6B47; /* positive poles dominate */
 
   --rau-status-live:      #3E9E6B;
   --rau-status-connecting:#E8A33D;
