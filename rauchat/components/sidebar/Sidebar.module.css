@@ -1,19 +1,21 @@
 .sidebar {
   height: 100%;
   min-height: 0;
+  min-width: 0;
   background: var(--rau-bg-l1);
   border-right: 1px solid var(--rau-border-subtle);
   display: flex;
   flex-direction: column;
-  width: var(--rau-sidebar-w);
-  transition: width var(--rau-dur-slow) var(--rau-ease-inout);
+  /* Fill the shell's animated sidebar track; do not set an independent
+     pixel width that fights the grid (that was stretching telemetry). */
+  width: 100%;
+  overflow: hidden;
 }
 
 /* The rail is the same surface, just narrower — it must keep the bg-l1 fill,
    the right border and the column layout (§3.3). */
 .sidebarCollapsed {
   composes: sidebar;
-  width: var(--rau-sidebar-w-collapsed);
 }
 
 /* ---- Header ---- */

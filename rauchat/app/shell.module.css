@@ -1,0 +1,38 @@
+/* App shell grid (§3.1). Side-track widths animate via registered <length>
+   custom properties so only those tracks interpolate — never the full
+   `grid-template-columns` list (which mis-distributes free space into the
+   telemetry column while the sidebar expands). */
+
+.shell {
+  --rau-shell-sidebar: var(--rau-sidebar-w);
+  --rau-shell-telemetry: var(--rau-telemetry-w);
+  display: grid;
+  grid-template-columns:
+    var(--rau-shell-sidebar)
+    minmax(0, 1fr)
+    var(--rau-shell-telemetry);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+  transition:
+    --rau-shell-sidebar var(--rau-dur-slow) var(--rau-ease-inout),
+    --rau-shell-telemetry var(--rau-dur-slow) var(--rau-ease-inout);
+}
+
+.sidebarCollapsed {
+  --rau-shell-sidebar: var(--rau-sidebar-w-collapsed);
+}
+
+.telemetryCollapsed {
+  --rau-shell-telemetry: var(--rau-telemetry-w-rail);
+}
+
+/* Diagram column is inserted between chat and telemetry; structure changes
+   are discrete (no width interpolation across a different track count). */
+.withDiagram {
+  grid-template-columns:
+    var(--rau-shell-sidebar)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-shell-telemetry);
+}

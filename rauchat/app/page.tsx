@@ -18,6 +18,7 @@ import { TelemetryPanel } from "@/components/telemetry";
 import { DiagramPanel } from "@/components/diagrams";
 import { collectDiagrams } from "@/lib/diagrams";
 import { Sidebar } from "@/components/sidebar/Sidebar";
+import shell from "./shell.module.css";
 import {
   AccountModal,
   type Account,
@@ -639,37 +640,17 @@ export default function Home() {
       .filter((s): s is TraitSnapshot => Boolean(s));
   }, [store.activeConversation]);
 
+  const shellClass = [
+    shell.shell,
+    sidebarCollapsed ? shell.sidebarCollapsed : "",
+    telemetryCollapsed ? shell.telemetryCollapsed : "",
+    openDiagram ? shell.withDiagram : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      style={{
-        display: "grid",
-        // Keep both side columns explicit. In particular, the right telemetry
-        // track must remain pinned to the viewport while the left sidebar
-        // animates between its panel and rail widths.
-        // With a diagram open the telemetry column drops to its rail so the
-        // panel gets real width without squeezing the transcript.
-        gridTemplateColumns: [
-          sidebarCollapsed
-            ? "var(--rau-sidebar-w-collapsed)"
-            : "var(--rau-sidebar-w)",
-          "minmax(0, 1fr)",
-          openDiagram ? "minmax(0, clamp(380px, 42%, 760px))" : null,
-          telemetryCollapsed
-            ? "var(--rau-telemetry-w-rail)"
-            : "var(--rau-telemetry-w)",
-        ]
-          .filter(Boolean)
-          .join(" "),
-        // Without an explicit row, the implicit `auto` row grows with content
-        // and every column overflows 100vh — which breaks internal scrollers
-        // (their height: 100% resolves against the oversized row).
-        gridTemplateRows: "minmax(0, 1fr)",
-        height: "100vh",
-        overflow: "hidden",
-        transition:
-          "grid-template-columns var(--rau-dur-slow) var(--rau-ease-inout)",
-      }}
-    >
+    <div className={shellClass}>
       <Sidebar
         store={store}
         onOpenSkills={() => setSkillsOpen(true)}
