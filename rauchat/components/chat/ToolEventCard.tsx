@@ -575,10 +575,74 @@ function SvgRenderBody({ event }: { event: ToolEvent }) {
     return <EmptyLine>Could not render the SVG.</EmptyLine>;
   }
 
+  return <AnimatedSvg clean={clean} title={title} />;
+}
+
+function AnimatedSvg({ clean, title }: { clean: string; title?: string }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Inline markup lets us measure each sanitized geometry and reveal the
+  // drawing in construction order. The model is already prompted to emit
+  // structural lines before details, so DOM order becomes drawing order.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.classList.remove(styles.svgCanvasDrawing);
+    canvas.classList.add(styles.svgCanvasPreparing);
+
+    const reducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (reducedMotion) {
+      canvas.classList.remove(styles.svgCanvasPreparing);
+      canvas.classList.add(styles.svgCanvasDrawing);
+      return;
+    }
+
+    const geometries = Array.from(
+      canvas.querySelectorAll<SVGGeometryElement>(
+        "path, line, polyline, polygon, rect, circle, ellipse",
+      ),
+    );
+    geometries.forEach((geometry, index) => {
+      let length = 1;
+      try {
+        length = Math.max(1, geometry.getTotalLength());
+      } catch {
+        // A malformed-but-safe geometry still gets a short opacity reveal.
+      }
+      geometry.style.setProperty("--sketch-stroke-length", `${length}`);
+      geometry.style.setProperty(
+        "--sketch-stroke-delay",
+        `${Math.min(index * 72, 1600)}ms`,
+      );
+      geometry.style.setProperty(
+        "--sketch-stroke-duration",
+        `${Math.min(760, Math.max(320, length * 2.4))}ms`,
+      );
+    });
+
+    canvas.querySelectorAll<SVGTextElement>("text").forEach((label, index) => {
+      label.style.setProperty(
+        "--sketch-label-delay",
+        `${Math.min(geometries.length * 72 + index * 60, 1900)}ms`,
+      );
+    });
+
+    // Change only the class: a React state render would re-assign
+    // dangerouslySetInnerHTML and wipe the measured inline dash lengths.
+    const frame = requestAnimationFrame(() => {
+      canvas.classList.remove(styles.svgCanvasPreparing);
+      canvas.classList.add(styles.svgCanvasDrawing);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [clean]);
+
   return (
     <figure className={styles.svgFigure}>
       <div
-        className={styles.svgCanvas}
+        ref={canvasRef}
+        className={`${styles.svgCanvas} ${styles.svgCanvasPreparing}`}
         role="img"
         aria-label={title || "Sketch"}
         // Sanitized markup only — see prepareSvgForChat / sanitizeSvg.

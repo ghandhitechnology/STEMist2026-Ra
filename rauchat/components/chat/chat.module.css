@@ -1627,7 +1627,13 @@
 }
 
 /* svg_render — transparent line drawings; ink follows --rau-text-primary. */
+.inlineSketchBlock {
+  display: block;
+  width: 100%;
+  margin: var(--rau-space-7) 0;
+}
 .svgFigure {
+  width: 100%;
   margin: 0;
   border: var(--rau-hairline) solid var(--rau-border-subtle);
   border-radius: var(--rau-radius-lg);
@@ -1638,7 +1644,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px;
+  padding: var(--rau-space-7);
   background: transparent;
   color: var(--rau-text-primary);
   overflow: auto;
@@ -1646,11 +1652,47 @@
 }
 .svgCanvas > svg {
   display: block;
-  width: auto;
+  width: 100%;
   max-width: 100%;
   height: auto;
-  max-height: 420px;
+  max-height: 480px;
   background: transparent;
+}
+.svgCanvasPreparing > svg :is(path, line, polyline, polygon, rect, circle, ellipse),
+.svgCanvasPreparing > svg text {
+  opacity: 0;
+}
+.svgCanvasDrawing > svg :is(path, line, polyline, polygon, rect, circle, ellipse) {
+  stroke-dasharray: var(--sketch-stroke-length);
+  stroke-dashoffset: var(--sketch-stroke-length);
+  animation: sketchStrokeReveal var(--sketch-stroke-duration)
+    var(--rau-ease-standard) var(--sketch-stroke-delay) forwards;
+}
+.svgCanvasDrawing > svg text {
+  opacity: 0;
+  animation: sketchLabelReveal 320ms var(--rau-ease-standard)
+    var(--sketch-label-delay) forwards;
+}
+@keyframes sketchStrokeReveal {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: var(--sketch-stroke-length);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sketchLabelReveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .svgCaption {
   margin: 0;
@@ -1660,6 +1702,18 @@
   color: var(--rau-text-tertiary);
   text-align: center;
   border-top: var(--rau-hairline) solid var(--rau-border-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .svgCanvasPreparing > svg :is(path, line, polyline, polygon, rect, circle, ellipse),
+  .svgCanvasPreparing > svg text,
+  .svgCanvasDrawing > svg :is(path, line, polyline, polygon, rect, circle, ellipse),
+  .svgCanvasDrawing > svg text {
+    opacity: 1;
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
 }
 
 /* §7 grouping */
