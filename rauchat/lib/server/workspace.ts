@@ -28,6 +28,10 @@ export function skillsDirFor(userId: string): string {
   return path.join(workspaceRootFor(userId), "skills");
 }
 
+export function uploadsDirFor(userId: string): string {
+  return path.join(workspaceRootFor(userId), "uploads");
+}
+
 /**
  * Idempotently creates a user's workspace root and reserved subdirectories.
  *
@@ -40,6 +44,7 @@ export async function ensureWorkspaceDirs(userId: string): Promise<void> {
   await mkdir(workspaceRootFor(userId), { recursive: true });
   await mkdir(exportsDirFor(userId), { recursive: true });
   await mkdir(skillsDirFor(userId), { recursive: true });
+  await mkdir(uploadsDirFor(userId), { recursive: true });
 }
 
 /**
@@ -79,6 +84,27 @@ export async function writeWorkspaceFile(
   const abs = resolveWorkspacePath(userId, relPath);
   await mkdir(path.dirname(abs), { recursive: true });
   await writeFile(abs, content, "utf8");
+}
+
+/** Binary write for composer uploads and other non-UTF8 payloads. */
+export async function writeWorkspaceBytes(
+  userId: string,
+  relPath: string,
+  data: Buffer | Uint8Array
+): Promise<void> {
+  await ensureWorkspaceDirs(userId);
+  const abs = resolveWorkspacePath(userId, relPath);
+  await mkdir(path.dirname(abs), { recursive: true });
+  await writeFile(abs, data);
+}
+
+export async function readWorkspaceBytes(
+  userId: string,
+  relPath: string
+): Promise<Buffer> {
+  await ensureWorkspaceDirs(userId);
+  const abs = resolveWorkspacePath(userId, relPath);
+  return readFile(abs);
 }
 
 export type WorkspaceFileEntry = {

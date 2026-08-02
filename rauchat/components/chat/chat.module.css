@@ -356,6 +356,26 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.messageAttachRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rau-space-3);
+  margin-bottom: var(--rau-space-3);
+}
+.messageAttachChip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--rau-space-8);
+  padding: 0 var(--rau-space-4);
+  background: var(--rau-bg-inset);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-sm);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-secondary);
+  max-width: 220px;
+  white-space: nowrap;
+}
 .userActions {
   align-self: flex-start;
 }

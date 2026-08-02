@@ -108,11 +108,22 @@ export type ToolEvent = {
   result?: unknown;
 };
 
+/** Composer attachment stored on a user turn after upload to the workspace. */
+export type MessageAttachment = {
+  /** Workspace-relative path, e.g. `uploads/…`. */
+  path: string;
+  name: string;
+  size: number;
+  mimeType: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: number;
+  /** Files attached to this user turn (workspace uploads). */
+  attachments?: MessageAttachment[];
   toolEvents?: ToolEvent[];
   traitSnapshot?: TraitSnapshot;
 };

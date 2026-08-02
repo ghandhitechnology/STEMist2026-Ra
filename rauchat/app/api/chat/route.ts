@@ -2,7 +2,7 @@
  * app/api/chat/route.ts — POST -> SSE stream, served entirely via OpenRouter.
  *
  * Wire format (matches lib/useChatStream.ts):
- *   POST { conversationId?, messages, tools, skillId, forceTools, model?, thinking? }
+ *   POST { conversationId?, messages, tools, skillId, forceTools, model?, thinking?, attachments? }
  *
  * Event contract (consumed by the chat UI):
  *   event: text            data: { delta: string }
@@ -27,7 +27,7 @@
 import type { NextRequest } from "next/server";
 import type OpenAI from "openai";
 import { z } from "zod";
-import type { Skill, ToolEvent, ToolName } from "@/lib/types";
+import type { MessageAttachment, Skill, ToolEvent, ToolName } from "@/lib/types";
 import { clampThinking, getModel } from "@/lib/models";
 import { createSSEResponse } from "@/lib/server/sse";
 import { getOpenRouter, reasoningParam } from "@/lib/server/openrouter";
@@ -37,6 +37,7 @@ import { getTraitSnapshot } from "@/lib/server/traits";
 import { getUserId, unauthorized } from "@/lib/server/auth";
 import { getProfile, type Profile } from "@/lib/server/profile";
 import { readMemory } from "@/lib/server/memory";
+import { buildUserMessageWithAttachments } from "@/lib/server/attachments";
 
 export const runtime = "nodejs";
 
@@ -83,6 +84,13 @@ const ToolNameSchema = z.enum([
   "memory_add",
 ]);
 
+const AttachmentSchema = z.object({
+  path: z.string().min(1),
+  name: z.string().min(1),
+  size: z.number().nonnegative(),
+  mimeType: z.string().min(1),
+});
+
 const ChatRequestSchema = z.object({
   conversationId: z.string().optional(),
   messages: z.array(MessageInputSchema).min(1, "messages must not be empty"),
@@ -91,6 +99,8 @@ const ChatRequestSchema = z.object({
   forceTools: z.boolean().optional().default(false),
   model: z.string().optional(),
   thinking: z.string().optional(),
+  /** Workspace uploads for the current turn (enrich the latest user message). */
+  attachments: z.array(AttachmentSchema).optional().default([]),
 });
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
@@ -203,7 +213,13 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const { messages, tools: requestedTools, skillId, forceTools } = parsed.data;
+  const {
+    messages,
+    tools: requestedTools,
+    skillId,
+    forceTools,
+    attachments,
+  } = parsed.data;
   const model = getModel(parsed.data.model);
   const thinking = clampThinking(model, parsed.data.thinking);
 
@@ -230,6 +246,7 @@ export async function POST(req: NextRequest) {
     // Skill tool capabilities join the tools explicitly selected in the
     // composer. Diagrams and memory remain foundational capabilities.
     const effectiveToolNames = new Set<ToolName>(requestedTools);
+    if (attachments.length) effectiveToolNames.add("file_read");
     for (const skill of activeSkills) {
       for (const tool of skill.capabilities?.tools ?? []) {
         effectiveToolNames.add(tool);
@@ -269,8 +286,22 @@ export async function POST(req: NextRequest) {
 
     const chatMessages: ChatMessage[] = [
       { role: "system", content: system },
-      ...messages.map((m) => ({ role: m.role, content: m.content })),
     ];
+    const latestUserIndex = messages.map((m) => m.role).lastIndexOf("user");
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if (m.role === "user" && i === latestUserIndex && attachments.length) {
+        chatMessages.push(
+          await buildUserMessageWithAttachments(
+            userId,
+            m.content,
+            attachments as MessageAttachment[]
+          )
+        );
+      } else {
+        chatMessages.push({ role: m.role, content: m.content });
+      }
+    }
 
     let finalAssistantText = "";
     const traitEvidence: string[] = [];

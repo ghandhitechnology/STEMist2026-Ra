@@ -34,7 +34,7 @@ export type ChatViewProps = {
   conversation: Conversation | null;
   /** The in-flight turn, straight from useChatStream().state. */
   streamingState: StreamingState;
-  onSendMessage: (submission: ComposerSubmission) => void;
+  onSendMessage: (submission: ComposerSubmission) => void | Promise<void>;
   onStop?: () => void;
   /** Retry after a failed generation (§8). */
   onRetry?: () => void;
@@ -74,6 +74,7 @@ export type ChatViewProps = {
   onSelectSkill?: (id: string | null) => void;
   onAttach?: (files: File[]) => void;
   composerError?: string | null;
+  onDismissComposerError?: () => void;
   notice?: { tone: "neutral" | "warning"; message: string } | null;
   suggestions?: string[];
 } & MessageActions;
@@ -107,6 +108,7 @@ export const ChatView = memo(function ChatView({
   onSelectSkill,
   onAttach,
   composerError = null,
+  onDismissComposerError,
   notice = null,
   suggestions,
   ...messageActions
@@ -271,6 +273,7 @@ export const ChatView = memo(function ChatView({
           onSelectSkill={onSelectSkill}
           onAttach={onAttach}
           error={composerError}
+          onDismissError={onDismissComposerError}
           notice={notice}
         />
       </div>

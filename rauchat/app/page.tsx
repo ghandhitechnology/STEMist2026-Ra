@@ -41,6 +41,7 @@ import type {
   Diagram,
   Conversation,
   Message,
+  MessageAttachment,
   Skill,
   SkillDraft,
   ToolEvent,
@@ -142,6 +143,7 @@ export default function Home() {
 
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [composerError, setComposerError] = useState<string | null>(null);
 
   // "/auto" mode: every tool is loaded each turn and the agent decides when
   // to use them. Persisted so it survives reloads.
@@ -410,9 +412,34 @@ export default function Home() {
   );
 
   const handleSend = useCallback(
-    (submission: ComposerSubmission) => {
+    async (submission: ComposerSubmission) => {
       const text = submission.text.trim();
-      if (!text) return;
+      const pendingFiles = submission.files;
+      if (!text && pendingFiles.length === 0) return;
+      setComposerError(null);
+
+      let attachments: MessageAttachment[] | undefined;
+      if (pendingFiles.length > 0) {
+        const form = new FormData();
+        for (const file of pendingFiles) form.append("file", file);
+        const uploadRes = await fetch("/api/files/upload", {
+          method: "POST",
+          body: form,
+        });
+        const uploadBody = (await uploadRes.json().catch(() => null)) as {
+          error?: unknown;
+          files?: MessageAttachment[];
+        } | null;
+        if (!uploadRes.ok || !Array.isArray(uploadBody?.files)) {
+          const message =
+            typeof uploadBody?.error === "string"
+              ? uploadBody.error
+              : "Could not upload the attachment.";
+          setComposerError(message);
+          throw new Error(message);
+        }
+        attachments = uploadBody.files;
+      }
 
       let conversation = store.activeConversation;
       if (!conversation) {
@@ -429,8 +456,9 @@ export default function Home() {
       const userMessage: Message = {
         id: generateId(),
         role: "user",
-        content: text,
+        content: text || "See attached file(s).",
         createdAt: Date.now(),
+        ...(attachments?.length ? { attachments } : {}),
       };
       store.appendMessage(conversationId, userMessage);
 
@@ -440,12 +468,15 @@ export default function Home() {
       salvageInterruptedTurn(conversationId);
 
       const model = getModel(conversation.modelId ?? modelChoice.modelId);
+      const tools = new Set<ToolName>(submission.tools);
+      if (attachments?.length) tools.add("file_read");
+
       pendingConversationIdRef.current = conversationId;
       setStreamOwnerId(conversationId);
       void chat.send({
         messages: [...conversation.messages, userMessage],
         conversationId,
-        tools: submission.tools,
+        tools: Array.from(tools),
         skillId: submission.skillId,
         forceTools: submission.forceTools,
         model: model.id,
@@ -453,6 +484,7 @@ export default function Home() {
           model,
           conversation.thinking ?? modelChoice.thinking
         ),
+        attachments,
       });
     },
     [chat, store, modelChoice, salvageInterruptedTurn]
@@ -699,6 +731,8 @@ export default function Home() {
         onOpenDiagram={handleOpenDiagram}
         openDiagramId={openDiagramId}
         resolveDownloadUrl={resolveDownloadUrl}
+        composerError={composerError}
+        onDismissComposerError={() => setComposerError(null)}
       />
 
       {openDiagram ? (

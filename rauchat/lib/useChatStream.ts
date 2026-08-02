@@ -18,7 +18,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Message, ToolEvent, ToolName, TraitSnapshot } from "./types";
+import type {
+  Message,
+  MessageAttachment,
+  ToolEvent,
+  ToolName,
+  TraitSnapshot,
+} from "./types";
 
 export type StreamingMessage = {
   content: string;
@@ -57,6 +63,11 @@ export type SendInput = {
   model?: string;
   /** Thinking level (lib/models.ts ThinkingLevel); omit for the model's default. */
   thinking?: string;
+  /**
+   * Workspace uploads for the current turn only. The server uses these to
+   * enrich the latest user message (inline text / vision / path inventory).
+   */
+  attachments?: readonly MessageAttachment[];
   /** Merged into the request body verbatim. */
   extra?: Record<string, unknown>;
 };
@@ -270,6 +281,9 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
             forceTools: input.forceTools ?? false,
             ...(input.model !== undefined ? { model: input.model } : {}),
             ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
+            ...(input.attachments && input.attachments.length
+              ? { attachments: input.attachments }
+              : {}),
             ...input.extra,
           }),
         });

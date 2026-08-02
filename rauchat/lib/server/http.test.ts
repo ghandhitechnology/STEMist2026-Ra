@@ -89,6 +89,30 @@ describe("crossSiteRejection", () => {
     expect(await responseCode(result)).toBe("AUTH_CONTENT_TYPE_INVALID");
   });
 
+  it("allows multipart when opted in", () => {
+    const result = crossSiteRejection(
+      authRequest({
+        contentType: "multipart/form-data; boundary=abc",
+        origin: "https://rau.example",
+        site: "same-origin",
+      }),
+      { allowMultipart: true }
+    );
+    expect(result).toBeNull();
+  });
+
+  it("rejects multipart when not opted in", async () => {
+    const result = crossSiteRejection(
+      authRequest({
+        contentType: "multipart/form-data; boundary=abc",
+        origin: "https://rau.example",
+        site: "same-origin",
+      })
+    );
+    expect(result?.status).toBe(415);
+    expect(await responseCode(result)).toBe("AUTH_CONTENT_TYPE_INVALID");
+  });
+
   it("accepts trusted overwritten proxy headers when no canonical URL is set", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("RAUCHAT_PUBLIC_URL", "");

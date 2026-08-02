@@ -42,6 +42,7 @@ Skills library expose the same sandbox and skill set through the UI.
 │  POST /api/traits          standalone {text} → TraitSnapshot         │
 │  GET/POST/DELETE /api/skills   skill CRUD                            │
 │  GET/POST /api/files           workspace list / read / write         │
+│  POST /api/files/upload        multipart composer attachments        │
 │  GET  /api/pdf/[...path]       download a generated PDF              │
 │                                                                       │
 │  lib/server/tools.ts     web_search · pdf_create · file_read/write · │
@@ -183,10 +184,11 @@ is rejected with `AUTH_ORIGIN_MISMATCH` before credentials leave Rauchat.
 
 ## Known limitations
 
-- Composer file attachments are accepted in the UI but not yet uploaded to
-  `/api/chat` — there's no multipart/attachment path on the server today.
+- Composer attachments upload to the per-user workspace (`uploads/`) and are
+  enriched into the chat turn (text inlined, images as vision parts, other
+  binaries path-referenced). PDF/binary text extraction is not implemented.
 - `onRetry` and `onRegenerate` resend the conversation history without
-  remembering the original turn's tool/skill selection.
+  remembering the original turn's tool/skill selection or attachments.
 - `TelemetryPanel`'s `onSelectTurn` (click a point in the trait history to
   jump the transcript to that turn) has no scroll-to-message wiring yet —
   `MessageList` doesn't expose a scroll-to-index handle.

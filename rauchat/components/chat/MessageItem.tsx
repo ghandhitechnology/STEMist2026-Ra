@@ -217,9 +217,25 @@ export const MessageItem = memo(function MessageItem({
   }, [message.role, message.content, isStreaming, expandedTurn]);
 
   if (message.role === "user") {
+    const attachments = message.attachments ?? [];
     return (
       <article className={`${styles.turn} ${styles.userTurn}`} data-role="user">
-        <div className={styles.userBlock}>{message.content}</div>
+        <div className={styles.userBlock}>
+          {attachments.length > 0 ? (
+            <div className={styles.messageAttachRow}>
+              {attachments.map((att) => (
+                <span
+                  key={att.path}
+                  className={styles.messageAttachChip}
+                  title={att.path}
+                >
+                  <span className={styles.attachName}>{att.name}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {message.content}
+        </div>
         <ActionBar message={message} className={styles.userActions} {...actions} />
       </article>
     );

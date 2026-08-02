@@ -77,7 +77,8 @@ export type ComposerHandle = {
 };
 
 export type ComposerProps = {
-  onSend: (submission: ComposerSubmission) => void;
+  /** May return a Promise; draft/attachments clear only after it resolves. */
+  onSend: (submission: ComposerSubmission) => void | Promise<void>;
   onStop?: () => void;
   isStreaming?: boolean;
   disabled?: boolean;
@@ -95,6 +96,8 @@ export type ComposerProps = {
   onAttach?: (files: File[]) => void;
   /** Composer-level error strip, e.g. "PDF exceeds 32 MB." (§4.5) */
   error?: string | null;
+  /** Fired when the user edits the draft or attachments so the strip can clear. */
+  onDismissError?: () => void;
   /** Bar above the shell for offline / rate-limit copy (§8). */
   notice?: { tone: "neutral" | "warning"; message: string } | null;
   placeholder?: string;
@@ -117,6 +120,7 @@ export const Composer = memo(
       onSelectSkill,
       onAttach,
       error = null,
+      onDismissError,
       notice = null,
       placeholder = "Message Rauchat",
     },
@@ -132,9 +136,20 @@ export const Composer = memo(
       () => new Set(defaultTools ?? [])
     );
     const [files, setFiles] = useState<File[]>([]);
+    const [localError, setLocalError] = useState<string | null>(null);
     const [grown, setGrown] = useState(false);
     const [scrolling, setScrolling] = useState(false);
     const [dragOver, setDragOver] = useState(false);
+    const displayError = error ?? localError;
+
+    const updateDraft = useCallback(
+      (value: string) => {
+        setDraftState(value);
+        if (localError) setLocalError(null);
+        onDismissError?.();
+      },
+      [localError, onDismissError]
+    );
 
     /* ---- slash-command menu (tools + skills) ---- */
     // Open while the draft is a lone "/token" (no space yet); Esc dismisses.
@@ -236,7 +251,8 @@ export const Composer = memo(
       []
     );
 
-    const canSend = draft.trim().length > 0 && !disabled && !isStreaming;
+    const canSend =
+      (draft.trim().length > 0 || files.length > 0) && !disabled && !isStreaming;
 
     const toggleTool = useCallback((tool: ToolName) => {
       setTools((prev) => {
@@ -272,79 +288,88 @@ export const Composer = memo(
 
     const submit = useCallback(
       (forceTools: boolean) => {
-        let text = draft.trim();
-        if (!text || disabled || isStreaming) return;
+        void (async () => {
+          let text = draft.trim();
+          if ((!text && files.length === 0) || disabled || isStreaming) return;
 
-        // "/token rest of message" turns a tool on or invokes a skill.
-        let skillId = activeSkillId;
-        const sendTools = new Set(tools);
-        // Auto mode: the agent gets every usable tool; research stays a
-        // manual mode (it rewrites the system prompt, not just the tool set).
-        if (autoTools) {
-          for (const t of TOOL_CHIPS) {
-            if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
-              sendTools.add(t.tool);
+          // "/token rest of message" turns a tool on or invokes a skill.
+          let skillId = activeSkillId;
+          const sendTools = new Set(tools);
+          // Auto mode: the agent gets every usable tool; research stays a
+          // manual mode (it rewrites the system prompt, not just the tool set).
+          if (autoTools) {
+            for (const t of TOOL_CHIPS) {
+              if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
+                sendTools.add(t.tool);
+              }
             }
           }
-        }
-        const slash = /^\/(\S+)\s*([\s\S]*)$/.exec(text);
-        if (slash && slash[1].toLowerCase() === "auto") {
-          if (!slash[2].trim()) {
-            // Bare "/auto" toggles the mode.
-            onToggleAutoTools?.();
-            setDraftState("");
-            return;
-          }
-          // "/auto message" turns the mode on and applies it to this send.
-          if (!autoTools) onToggleAutoTools?.();
-          for (const t of TOOL_CHIPS) {
-            if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
-              sendTools.add(t.tool);
-            }
-          }
-          text = slash[2].trim();
-        } else if (slash) {
-          const token = slash[1].toLowerCase();
-          const chip = TOOL_CHIPS.find(
-            (t) =>
-              skillSlug(t.label) === token ||
-              t.tool === token ||
-              t.tool.replace(/_/g, "-") === token
-          );
-          const skill = skills?.find(
-            (s) => skillSlug(s.name) === token || s.name.toLowerCase() === token
-          );
-          if (chip && !unavailableTools?.[chip.tool]) {
+          const slash = /^\/(\S+)\s*([\s\S]*)$/.exec(text);
+          if (slash && slash[1].toLowerCase() === "auto") {
             if (!slash[2].trim()) {
-              // Bare "/web-search" just toggles the tool.
-              toggleTool(chip.tool);
+              // Bare "/auto" toggles the mode.
+              onToggleAutoTools?.();
               setDraftState("");
               return;
             }
-            sendTools.add(chip.tool);
-            setTools(new Set(sendTools));
-            text = slash[2].trim();
-          } else if (skill) {
-            if (!slash[2].trim()) {
-              // Bare "/skill-name" just activates the skill.
-              pickSkill(skill.id);
-              return;
+            // "/auto message" turns the mode on and applies it to this send.
+            if (!autoTools) onToggleAutoTools?.();
+            for (const t of TOOL_CHIPS) {
+              if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
+                sendTools.add(t.tool);
+              }
             }
-            skillId = skill.id;
-            onSelectSkill?.(skill.id);
             text = slash[2].trim();
+          } else if (slash) {
+            const token = slash[1].toLowerCase();
+            const chip = TOOL_CHIPS.find(
+              (t) =>
+                skillSlug(t.label) === token ||
+                t.tool === token ||
+                t.tool.replace(/_/g, "-") === token
+            );
+            const skill = skills?.find(
+              (s) =>
+                skillSlug(s.name) === token || s.name.toLowerCase() === token
+            );
+            if (chip && !unavailableTools?.[chip.tool]) {
+              if (!slash[2].trim()) {
+                // Bare "/web-search" just toggles the tool.
+                toggleTool(chip.tool);
+                setDraftState("");
+                return;
+              }
+              sendTools.add(chip.tool);
+              setTools(new Set(sendTools));
+              text = slash[2].trim();
+            } else if (skill) {
+              if (!slash[2].trim()) {
+                // Bare "/skill-name" just activates the skill.
+                pickSkill(skill.id);
+                return;
+              }
+              skillId = skill.id;
+              onSelectSkill?.(skill.id);
+              text = slash[2].trim();
+            }
           }
-        }
 
-        onSend({
-          text,
-          tools: Array.from(sendTools),
-          skillId,
-          files,
-          forceTools,
-        });
-        setDraftState("");
-        setFiles([]);
+          const outgoing = [...files];
+          try {
+            await onSend({
+              text,
+              tools: Array.from(sendTools),
+              skillId,
+              files: outgoing,
+              forceTools,
+            });
+            setDraftState("");
+            setFiles([]);
+            setLocalError(null);
+          } catch {
+            // Parent surfaces the error on the composer strip; keep draft/files.
+          }
+        })();
       },
       [
         activeSkillId,
@@ -411,13 +436,21 @@ export const Composer = memo(
     );
 
     /* ---- attachments ---- */
+    const MAX_ATTACH_BYTES = 32 * 1024 * 1024;
     const addFiles = useCallback(
       (incoming: File[]) => {
         if (incoming.length === 0) return;
+        onDismissError?.();
+        const oversized = incoming.find((f) => f.size > MAX_ATTACH_BYTES);
+        if (oversized) {
+          setLocalError(`${oversized.name || "File"} exceeds 32 MB.`);
+          return;
+        }
+        setLocalError(null);
         setFiles((prev) => [...prev, ...incoming]);
         onAttach?.(incoming);
       },
-      [onAttach]
+      [onAttach, onDismissError]
     );
 
     const onDrop = useCallback(
@@ -495,7 +528,7 @@ export const Composer = memo(
             className={[
               styles.shell,
               disabled || isStreaming ? styles.shellDisabled : "",
-              error ? styles.shellError : "",
+              displayError ? styles.shellError : "",
               dragOver ? styles.shellDragOver : "",
             ]
               .filter(Boolean)
@@ -585,7 +618,7 @@ export const Composer = memo(
                     scrolling ? styles.textareaScrolling : ""
                   }`}
                   value={draft}
-                  onChange={(e) => setDraftState(e.target.value)}
+                  onChange={(e) => updateDraft(e.target.value)}
                   onKeyDown={onKeyDown}
                   placeholder={isStreaming ? "Generating…" : placeholder}
                   disabled={disabled}
@@ -671,9 +704,9 @@ export const Composer = memo(
           </div>
           </div>
 
-          {error ? (
+          {displayError ? (
             <div className={styles.errorStrip} role="alert">
-              {error}
+              {displayError}
             </div>
           ) : null}
 

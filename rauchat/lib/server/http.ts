@@ -33,12 +33,23 @@ export function redirectTo(path: string): NextResponse {
   return new NextResponse(null, { status: 302, headers: { Location: path } });
 }
 
+export type CrossSiteRejectionOptions = {
+  /**
+   * When true, accept `multipart/form-data` in addition to JSON. Used by
+   * binary upload routes; origin / fetch-metadata checks still apply.
+   */
+  allowMultipart?: boolean;
+};
+
 /**
  * Rejects any state-changing request that did not originate from this app.
  * Returns a Response to send back, or null when the request is same-origin.
  */
-export function crossSiteRejection(req: NextRequest): Response | null {
-  const contentType = contentTypeRejection(req);
+export function crossSiteRejection(
+  req: NextRequest,
+  options: CrossSiteRejectionOptions = {}
+): Response | null {
+  const contentType = contentTypeRejection(req, options);
   if (contentType) return contentType;
 
   let expectedOrigin: string;
@@ -83,14 +94,20 @@ export function crossSiteRejection(req: NextRequest): Response | null {
  * cannot: `enctype="text/plain"` is the only way to shape a valid JSON body
  * from a form, and it cannot set this header.
  */
-function contentTypeRejection(req: NextRequest): Response | null {
-  const contentType = req.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().includes("application/json")) {
-    return authErrorResponse(
-      "AUTH_CONTENT_TYPE_INVALID",
-      "Expected a JSON request body.",
-      415
-    );
+function contentTypeRejection(
+  req: NextRequest,
+  options: CrossSiteRejectionOptions = {}
+): Response | null {
+  const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
+  if (contentType.includes("application/json")) return null;
+  if (options.allowMultipart && contentType.includes("multipart/form-data")) {
+    return null;
   }
-  return null;
+  return authErrorResponse(
+    "AUTH_CONTENT_TYPE_INVALID",
+    options.allowMultipart
+      ? "Expected a JSON or multipart request body."
+      : "Expected a JSON request body.",
+    415
+  );
 }
