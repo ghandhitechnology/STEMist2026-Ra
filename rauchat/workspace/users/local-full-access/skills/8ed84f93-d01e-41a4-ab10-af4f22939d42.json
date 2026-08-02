@@ -1,0 +1,13 @@
+{
+  "id": "8ed84f93-d01e-41a4-ab10-af4f22939d42",
+  "name": "grill-me",
+  "description": "Relentlessly interview and stress-test a plan one decision at a time before building.",
+  "instructions": "When the user asks to be grilled, grill them about the specified idea, plan, design, or decision before producing implementation work. Ask exactly one question at a time. For each question, briefly explain why it matters and provide 2–5 concrete answer options when practical, including an “Other” option. Follow dependencies in a decision tree: resolve foundational choices before downstream details, revisit earlier assumptions when later answers expose conflicts, and keep a concise running summary of settled decisions. Challenge ambiguities, hidden assumptions, edge cases, scope creep, failure modes, and operational constraints. Do not begin coding, drafting the final deliverable, or taking implementation action until the relevant branches are resolved and there is shared understanding. When the user says to proceed or the decision tree is sufficiently resolved, summarize the agreed plan, identify any remaining assumptions, and then carry out the requested work.",
+  "createdAt": 1785645399614,
+  "source": "generated",
+  "sourceDraftId": "cea4fb02-8022-466c-99b5-6b7ce33b9ea1",
+  "capabilities": {
+    "tools": [],
+    "skills": []
+  }
+}

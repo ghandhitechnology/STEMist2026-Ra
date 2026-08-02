@@ -27,9 +27,12 @@ export const TAILWIND_CDN = "https://cdn.tailwindcss.com";
 export const BABEL_CDN =
   "https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js";
 
+/** postMessage namespace shared with the host diagram panel. */
+export const DIAGRAM_MESSAGE_SOURCE = "rauchat:diagram";
+
 /** Sandbox grants: everything the preview needs, minus same-origin access. */
 export const DIAGRAM_SANDBOX =
-  "allow-scripts allow-forms allow-modals allow-popups allow-downloads";
+  "allow-scripts allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock allow-presentation";
 
 /** Kinds that run as a live document rather than as text/prose. */
 export function isRunnable(kind: DiagramKind): boolean {
@@ -79,6 +82,174 @@ const ERROR_OVERLAY = `
     var r = e && e.reason;
     show("Unhandled promise rejection", r && r.stack ? r.stack : String(r));
   });
+})();
+</script>`.trim();
+
+/**
+ * Gives every runnable artifact the same opt-in interaction contract while it
+ * remains isolated in its opaque origin.
+ *
+ * - Canvas and `[data-keyboard-control]` elements become focusable.
+ * - Custom controls receive a bubbling `diagramcontrol` event for each key;
+ *   Enter/Space also click non-native controls.
+ * - `[data-pointer-lock]` requests pointer lock from the user's click.
+ * - `window.RauArtifact` exposes focus/pointer-lock helpers to authored code.
+ * - State is reported to the host through postMessage only.
+ */
+const INTERACTION_BRIDGE = `
+<script>
+(function () {
+  var SOURCE = "${DIAGRAM_MESSAGE_SOURCE}";
+
+  function post(type, detail) {
+    if (window.parent === window) return;
+    window.parent.postMessage({ source: SOURCE, type: type, detail: detail || null }, "*");
+  }
+
+  function closest(element, selector) {
+    return element && element.closest ? element.closest(selector) : null;
+  }
+
+  function prepare(root) {
+    var scope = root && root.querySelectorAll ? root : document;
+    var controls = scope.querySelectorAll(
+      "canvas:not([tabindex]), [role='application']:not([tabindex]), " +
+      "[data-keyboard-control]:not([tabindex]), [data-pointer-lock]:not([tabindex])"
+    );
+    controls.forEach(function (element) {
+      element.setAttribute("tabindex", "0");
+      if (element.tagName === "CANVAS" && !element.hasAttribute("role")) {
+        element.setAttribute("role", "application");
+      }
+    });
+  }
+
+  function focusArtifact() {
+    var target = document.querySelector(
+      "[data-keyboard-control], [role='application'], canvas, [data-pointer-lock]"
+    ) || document.body;
+    if (target && target.focus) target.focus({ preventScroll: true });
+  }
+
+  function requestPointerLock(target) {
+    var element = target || document.querySelector("[data-pointer-lock], canvas");
+    if (!element || !element.requestPointerLock) {
+      post("pointerlockerror", { message: "This artifact has no pointer-lock target." });
+      return;
+    }
+    try {
+      var request = element.requestPointerLock();
+      if (request && request.catch) {
+        request.catch(function (error) {
+          post("pointerlockerror", { message: String(error && error.message || error) });
+        });
+      }
+    } catch (error) {
+      post("pointerlockerror", { message: String(error && error.message || error) });
+    }
+  }
+
+  document.addEventListener("pointerdown", function (event) {
+    var target = closest(
+      event.target,
+      "[data-keyboard-control], [role='application'], canvas, [data-pointer-lock]"
+    );
+    if (target && target.focus) target.focus({ preventScroll: true });
+    else if (document.body && document.body.focus) {
+      document.body.focus({ preventScroll: true });
+    }
+  }, true);
+
+  document.addEventListener("click", function (event) {
+    var target = closest(event.target, "[data-pointer-lock]");
+    if (target) requestPointerLock(target);
+  }, true);
+
+  document.addEventListener("keydown", function (event) {
+    var control = closest(event.target, "[data-keyboard-control]");
+    if (control) {
+      control.dispatchEvent(new CustomEvent("diagramcontrol", {
+        bubbles: true,
+        detail: {
+          key: event.key,
+          code: event.code,
+          repeat: event.repeat,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey
+        }
+      }));
+      var nativeControl = /^(BUTTON|INPUT|SELECT|TEXTAREA|A)$/.test(control.tagName);
+      if (!nativeControl && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        if (control.click) control.click();
+      }
+    }
+    if (event.key === "Escape") post("escape");
+  }, true);
+
+  document.addEventListener("focusin", function () { post("focus", { active: true }); });
+  document.addEventListener("focusout", function () {
+    setTimeout(function () {
+      post("focus", { active: document.hasFocus() });
+    }, 0);
+  });
+  document.addEventListener("pointerlockchange", function () {
+    post("pointerlock", { active: Boolean(document.pointerLockElement) });
+  });
+  document.addEventListener("pointerlockerror", function () {
+    post("pointerlockerror", { message: "Pointer lock was denied by the browser." });
+  });
+
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    if (!data || data.source !== SOURCE) return;
+    if (data.type === "focus") focusArtifact();
+    if (data.type === "request-pointer-lock") requestPointerLock();
+    if (data.type === "exit-pointer-lock" && document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+  });
+
+  window.RauArtifact = Object.freeze({
+    focus: focusArtifact,
+    requestPointerLock: requestPointerLock,
+    exitPointerLock: function () {
+      if (document.exitPointerLock) document.exitPointerLock();
+    },
+    isPointerLocked: function () { return Boolean(document.pointerLockElement); }
+  });
+
+  function ready() {
+    if (document.body && !document.body.hasAttribute("tabindex")) {
+      document.body.setAttribute("tabindex", "-1");
+    }
+    prepare(document);
+    if (window.MutationObserver) {
+      new MutationObserver(function (records) {
+        records.forEach(function (record) {
+          record.addedNodes.forEach(function (node) {
+            if (node && node.nodeType === 1) {
+              if (node.matches && node.matches(
+                "canvas, [role='application'], [data-keyboard-control], [data-pointer-lock]"
+              ) && !node.hasAttribute("tabindex")) {
+                node.setAttribute("tabindex", "0");
+              }
+              prepare(node);
+            }
+          });
+        });
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+    post("ready", { pointerLockSupported: "pointerLockElement" in document });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ready, { once: true });
+  } else {
+    ready();
+  }
 })();
 </script>`.trim();
 
@@ -259,6 +430,7 @@ Babel.registerPreset("diagram-tsx", {
 <body>
 <div id="root"></div>
 ${ERROR_OVERLAY}
+${INTERACTION_BRIDGE}
 <script type="text/babel" data-type="module" data-presets="diagram-tsx">
 import * as __ReactForMount from "react";
 import { createRoot as __createRoot } from "react-dom/client";
@@ -280,8 +452,12 @@ ${mount}
 function htmlDocument(code: string, title: string): string {
   const isFullDocument = /<html[\s>]/i.test(code) || /<!doctype/i.test(code);
   if (isFullDocument) {
-    // Inject the error overlay just before </body> so failures still surface.
-    return code.replace(/<\/body>/i, `${ERROR_OVERLAY}</body>`);
+    // Inject runtime helpers just before </body>. Some generated documents
+    // omit the closing tag; appending is still parsed into the body by HTML.
+    const additions = `${ERROR_OVERLAY}\n${INTERACTION_BRIDGE}`;
+    return /<\/body>/i.test(code)
+      ? code.replace(/<\/body>/i, `${additions}</body>`)
+      : `${code}\n${additions}`;
   }
   return `<!doctype html>
 <html lang="en">
@@ -295,6 +471,7 @@ function htmlDocument(code: string, title: string): string {
 <body>
 ${code}
 ${ERROR_OVERLAY}
+${INTERACTION_BRIDGE}
 </body>
 </html>`;
 }
@@ -314,6 +491,8 @@ svg { max-width:100%; height:auto; }
 </head>
 <body>
 ${code}
+${ERROR_OVERLAY}
+${INTERACTION_BRIDGE}
 </body>
 </html>`;
 }

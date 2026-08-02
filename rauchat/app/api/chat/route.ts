@@ -60,6 +60,8 @@ Rules:
 - Send the COMPLETE content on every write. Content is replaced, never patched or merged.
 - To revise, call the tool again with the SAME id — each write is saved as a new version.
 - React diagrams: TSX, import from 'react' (React 19 is available, along with react-dom/client), and export a default component. Tailwind utility classes work in html and react diagrams.
+- Interactive diagrams run in a focusable sandbox and can use normal pointer, form, and keyboard events. Prefer semantic native controls. Mark a custom keyboard target with \`data-keyboard-control\`; it will be focusable and receive a bubbling \`diagramcontrol\` event on key presses.
+- When mouse-look or relative pointer motion is genuinely useful, add \`data-pointer-lock\` to the target element. Pointer lock begins only after the user clicks that element. The host also provides immersive mode, and \`window.RauArtifact\` exposes \`focus()\`, \`requestPointerLock(element?)\`, \`exitPointerLock()\`, and \`isPointerLocked()\` helpers.
 - Diagrams must run standalone: no local imports, no external assets, no files that do not exist.
 - After writing one, briefly say what you made and what the user can do with it. Do not repeat the diagram's code in your reply.`;
 
