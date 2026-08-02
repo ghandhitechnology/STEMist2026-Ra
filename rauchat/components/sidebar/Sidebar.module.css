@@ -208,6 +208,32 @@
   font-family: var(--rau-font-mono);
 }
 
+.searchClear {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--rau-radius-xs);
+  background: transparent;
+  border: none;
+  color: var(--rau-text-quaternary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.searchClear:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-secondary);
+}
+
+.searchClear:focus-visible {
+  box-shadow: var(--rau-focus-ring);
+  outline: none;
+}
+
 /* ---- Conversation list ---- */
 
 .list {

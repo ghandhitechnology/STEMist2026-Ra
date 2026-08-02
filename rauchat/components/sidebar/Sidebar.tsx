@@ -6,7 +6,8 @@
  * as `store` so the parent owns the single source of truth.
  */
 
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { filterConversations } from "@/lib/conversation-search";
 import type { UseConversations } from "@/lib/store";
 import { accountInitials, type Account } from "../modals/AccountModal";
 import {
@@ -16,6 +17,7 @@ import {
   IconPlus,
   IconSearch,
   IconSkill,
+  IconX,
 } from "../modals/icons";
 import { ConversationItem } from "./ConversationItem";
 import styles from "./Sidebar.module.css";
@@ -87,16 +89,21 @@ export function Sidebar({
   );
   const leavingSet = useMemo(() => new Set(store.leavingIds), [store.leavingIds]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return store.conversations;
-    return store.conversations.filter((c) =>
-      c.title.toLowerCase().includes(q)
-    );
-  }, [store.conversations, query]);
+  const filtered = useMemo(
+    () => filterConversations(store.conversations, query),
+    [store.conversations, query]
+  );
 
   function handleSearchChange(event: ChangeEvent<HTMLInputElement>) {
     setQuery(event.target.value);
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    // Escape clears rather than bubbling to any global shortcut handler.
+    if (event.key === "Escape" && query) {
+      event.stopPropagation();
+      setQuery("");
+    }
   }
 
   function handleToggleCollapsed() {
@@ -152,10 +159,22 @@ export function Sidebar({
               className={styles.searchInput}
               value={query}
               onChange={handleSearchChange}
+              onKeyDown={handleSearchKeyDown}
               placeholder="Search"
               aria-label="Search conversations"
             />
-            {!query && <span className={styles.searchHint}>⌘K</span>}
+            {query ? (
+              <button
+                type="button"
+                className={styles.searchClear}
+                aria-label="Clear search"
+                onClick={() => setQuery("")}
+              >
+                <IconX size={12} />
+              </button>
+            ) : (
+              <span className={styles.searchHint}>⌘K</span>
+            )}
           </div>
         </div>
       )}
