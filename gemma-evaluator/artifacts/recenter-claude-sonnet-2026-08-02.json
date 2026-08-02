@@ -1,0 +1,1 @@
+{"factual":{"threshold":-55.806,"scale":0.76},"serious":{"threshold":33.768,"scale":3.233},"casual":{"threshold":-37.496,"scale":2.894},"creative":{"threshold":7.239,"scale":1.857},"honest":{"threshold":-49.681,"scale":1.065},"confident":{"threshold":32.9,"scale":3.038},"empathetic":{"threshold":-34.939,"scale":1.103},"calm":{"threshold":49.215,"scale":1.989}}

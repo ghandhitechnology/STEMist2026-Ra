@@ -143,3 +143,14 @@ layer 36/rank 8, and attach a trait snapshot after each completed answer.
 - Publish a new immutable image tag for code changes; do not repoint an old tag.
 - If the Pod is replaced, its proxy URL changes. Update
   `GEMMA_ENDPOINT_URL` or place a stable reverse proxy/domain in front of it.
+
+## 9. Trait recentering
+
+The artifact thresholds were calibrated on Gemma-generated extremes; live
+traffic is Claude text, which sits offset on every axis. The Pod env var
+`TRAIT_RECENTER_JSON` overrides `decisionThreshold`/`scoreScale` per trait
+(`{"traitId": {"threshold": <median natural raw>, "scale": <raw units per
+tanh unit>}}`). The values currently deployed were fit on 72 natural + 64
+pole-elicited Claude Sonnet responses on 2026-08-02 and are recorded in
+`gemma-evaluator/artifacts/recenter-claude-sonnet-2026-08-02.json`. Refit
+whenever the chat model or system prompt changes materially.
