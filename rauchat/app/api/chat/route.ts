@@ -52,20 +52,30 @@ const MAX_TOKENS = 16384;
 
 const BASE_SYSTEM_PROMPT = `You are Rauchat, a helpful, precise AI assistant. When tools are available, use them when they would materially improve the accuracy or usefulness of your answer; do not narrate tool availability, just use them. Respond in clear, well-structured markdown.
 
-# Diagrams
+# Artifacts vs inline sketches
 
-Substantial, self-contained content goes in the \`diagram\` tool rather than inline in your reply: interactive React components, standalone HTML pages, SVG graphics, long markdown documents, and complete code files. The user sees these rendered live in a side panel next to the conversation.
+Two different tools. Do not mix them up.
 
-Use a diagram when the content is something the user will run, reuse, edit, or read on its own — an app, a visualization, a chart, a game, a report, a full program. Keep short answers, explanations, and snippets under roughly 15 lines inline in your reply instead.
+## Artifacts (\`diagram\` tool — side panel)
+
+Self-contained deliverables the user will open, run, reuse, edit, or read on their own. They appear in a dedicated panel next to the chat:
+- Interactive React/HTML apps, tools, games, dashboards, visualizations
+- Long markdown documents, reports, and essays
+- Complete code files the user will keep
+- Large or iterative standalone SVG compositions meant as the product itself
 
 Rules:
 - Send the COMPLETE content on every write. Content is replaced, never patched or merged.
 - To revise, call the tool again with the SAME id — each write is saved as a new version.
-- React diagrams: TSX, import from 'react' (React 19 is available, along with react-dom/client), and export a default component. Tailwind utility classes work in html and react diagrams.
-- Interactive diagrams run in a focusable sandbox and can use normal pointer, form, and keyboard events. Prefer semantic native controls. Mark a custom keyboard target with \`data-keyboard-control\`; it will be focusable and receive a bubbling \`diagramcontrol\` event on key presses.
+- React artifacts: TSX, import from 'react' (React 19 is available, along with react-dom/client), and export a default component. Tailwind utility classes work in html and react artifacts.
+- Interactive artifacts run in a focusable sandbox and can use normal pointer, form, and keyboard events. Prefer semantic native controls. Mark a custom keyboard target with \`data-keyboard-control\`; it will be focusable and receive a bubbling \`diagramcontrol\` event on key presses.
 - When mouse-look or relative pointer motion is genuinely useful, add \`data-pointer-lock\` to the target element. Pointer lock begins only after the user clicks that element. The host also provides immersive mode, and \`window.RauArtifact\` exposes \`focus()\`, \`requestPointerLock(element?)\`, \`exitPointerLock()\`, and \`isPointerLocked()\` helpers.
-- Diagrams must run standalone: no local imports, no external assets, no files that do not exist.
-- After writing one, briefly say what you made and what the user can do with it. Do not repeat the diagram's code in your reply.`;
+- Artifacts must run standalone: no local imports, no external assets, no files that do not exist.
+- After writing one, briefly say what you made and what the user can do with it. Do not repeat the artifact's source in your reply.
+
+## Inline sketches (\`svg_render\` tool — in the chat)
+
+Small transparent line drawings that support the explanation — flowcharts, geometry, icons, concept sketches, quick schematics. They render inline in the transcript. Use them freely whenever a simple drawing would clarify the topic; you do not need the user to toggle SVG mode first. Never put interactive apps, long prose, or full programs here — those are artifacts.`;
 
 const MessageInputSchema = z.object({
   id: z.string().optional(),
@@ -100,7 +110,7 @@ const ChatRequestSchema = z.object({
   tools: z.array(ToolNameSchema).optional().default([]),
   skillId: z.string().nullable().optional().default(null),
   forceTools: z.boolean().optional().default(false),
-  /** Lets the model reach for svg_render on its own judgment, without an explicit ask. */
+  /** Composer "/auto" mode — server may expand tool availability from this. */
   autoTools: z.boolean().optional().default(false),
   model: z.string().optional(),
   thinking: z.string().optional(),
@@ -260,17 +270,15 @@ export async function POST(req: NextRequest) {
     }
     const research = effectiveToolNames.has("research");
     const webSearch = effectiveToolNames.has("web_search") || research;
-    // svg_render is gated on: an explicit ask (toggle, or a skill capability
-    // that added it — either way effectiveToolNames already has it), the
-    // latest user turns expressing visual intent, or the autoTools flag.
-    const svgExplicit = effectiveToolNames.has("svg_render");
-    // Only recent turns count: a stray visual word early in a long
-    // conversation shouldn't latch the tool (and its encouraging prompt) on
-    // for every turn that follows.
-    const svgIntent = messages
-      .filter((m) => m.role === "user")
-      .slice(-3)
-      .some((m) => detectVisualIntent(m.content));
+    // SVG chip / skill / auto / recent visual wording — amplify sketching.
+    // The tool itself is always on; this only strengthens the prompt.
+    const svgLeanIn =
+      effectiveToolNames.has("svg_render") ||
+      autoTools ||
+      messages
+        .filter((m) => m.role === "user")
+        .slice(-3)
+        .some((m) => detectVisualIntent(m.content));
 
     let system = BASE_SYSTEM_PROMPT + buildSkillSection(activeSkills);
     if (research) {
@@ -288,25 +296,23 @@ export async function POST(req: NextRequest) {
     system += buildMemorySection(memory);
 
     // --- Tools available this turn.
+    // diagram (artifacts), svg_render (inline sketches), and memory_add are
+    // foundational — always present, no composer toggle required.
     const activeToolNames = new Set<ToolName>([
       "diagram",
-      // Always available: the model must be able to remember on any turn.
+      "svg_render",
       "memory_add",
     ]);
     for (const tool of effectiveToolNames) {
       if (tool !== "research") activeToolNames.add(tool);
     }
     if (webSearch) activeToolNames.add("web_search");
-    if (svgExplicit || svgIntent || autoTools) {
-      activeToolNames.add("svg_render");
+    // svg_render stays on even if a skill/toggle list tried to drop it.
+    activeToolNames.add("svg_render");
+    system += "\n\n" + SVG_DRAWING_RULES;
+    if (svgLeanIn) {
       system +=
-        (svgExplicit || svgIntent
-          ? "\n\nThe svg_render tool is enabled for this conversation: the user wants visuals. When a small diagram, chart, or sketch would clarify your answer, call svg_render — it renders inline in the chat. Reference the rendered visual naturally."
-          : "\n\nThe svg_render tool is available but restricted: call it ONLY when a visual is absolutely necessary to answer correctly — when words alone cannot convey the spatial or structural relationship. Otherwise answer in text.") +
-        "\n\n" +
-        SVG_DRAWING_RULES;
-    } else {
-      activeToolNames.delete("svg_render");
+        "\n\nThe user is leaning toward visuals this turn — reach for svg_render whenever a quick sketch would help, not only when they literally ask for a drawing.";
     }
     const tools = OPENAI_TOOLS.filter((t) =>
       activeToolNames.has(t.function.name as ToolName)

@@ -347,10 +347,12 @@ export function detectVisualIntent(text: string): boolean {
 }
 
 /**
- * Drawing doctrine for `svg_render`, appended to the system prompt whenever
- * the tool is available. Keep this short — it runs every enabled turn.
+ * Drawing doctrine for `svg_render`, appended whenever the tool is available
+ * (it is foundational — every turn). Keep this short.
  */
-export const SVG_DRAWING_RULES = `When calling svg_render, follow this drawing doctrine:
-- Transparent line art only: fill='none', stroke='currentColor', no background rects or solid color blocks. Complete standalone <svg> with a viewBox; no scripts or external references. Do not repeat the SVG source in your reply.
-- Layered construction: lay down structural/skeletal lines first (proportions, major axes, bounding volumes), then add detail. Catch proportion errors before compounding them with ornament.
-- Geometric restraint: prefer technical diagrams, icons, and geometric compositions. Freehand figurative subjects (faces, animals, natural forms) lack the visual judgment needed to look artful — if asked for complex representation, keep it simple and stiff on purpose rather than fake fluency. Prefer diagramming the idea over illustrating the subject.`;
+export const SVG_DRAWING_RULES = `Inline sketch rules (\`svg_render\` — always available):
+- Use freely for small drawings that support the topic (flows, geometry, icons, schematics). Reference the sketch naturally in your reply; do not paste the SVG source as text.
+- Never use svg_render for interactive apps, long documents, full programs, or anything the user will iterate on as a deliverable — those go in the \`diagram\` artifact tool.
+- Transparent line art only: fill='none', stroke='currentColor', no background rects or solid color blocks. Complete standalone <svg> with a viewBox; no scripts or external references.
+- Layered construction: structural/skeletal lines first (proportions, major axes, bounding volumes), then detail.
+- Geometric restraint: prefer technical diagrams, icons, and geometric compositions. For complex figurative subjects, keep it simple and stiff rather than fake fluency — diagram the idea, don't illustrate the subject.`;

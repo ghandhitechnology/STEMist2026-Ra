@@ -430,14 +430,14 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
   {
     name: "diagram",
     description:
-      "Create or revise a self-contained document that the user views and interacts with in a dedicated panel: an interactive React component, a standalone HTML page, an SVG graphic, a long markdown document, or a code file. Use this for anything substantial the user will read, run, reuse, or iterate on — apps, visualizations, charts, games, tools, reports, full programs. Runnable diagrams support immersive mode, focused keyboard input, and pointer lock. Prefer semantic controls; mark custom keyboard targets with data-keyboard-control and opt pointer-lock targets in with data-pointer-lock. window.RauArtifact provides focus and pointer-lock helpers. Do NOT use it for short answers, explanations, or snippets under ~15 lines; those belong in the reply. Reuse the SAME id to revise an existing diagram (each write saves a new version), and always send the COMPLETE new content — content is never merged or patched. React diagrams must import from 'react' (React 19, plus react-dom/client) and export a default component; Tailwind CSS utility classes are available in html and react diagrams. Do not reference local files, imports, or assets that do not exist — a diagram must run standalone.",
+      "Create or revise an ARTIFACT in the side panel — a self-contained deliverable the user will open, run, reuse, edit, or read on its own: interactive React/HTML apps, tools, games, dashboards, long markdown documents/reports, complete code files, or large standalone SVG compositions meant as the product. Not for small explanatory sketches (use svg_render for those). Runnable artifacts support immersive mode, focused keyboard input, and pointer lock; prefer semantic controls; mark custom keyboard targets with data-keyboard-control and pointer-lock targets with data-pointer-lock; window.RauArtifact provides helpers. Reuse the SAME id to revise (each write is a new version) and always send COMPLETE content — never merge or patch. React artifacts must import from 'react' (React 19, plus react-dom/client) and export a default component; Tailwind is available in html/react. Must run standalone — no missing local imports or assets.",
     input_schema: {
       type: "object",
       properties: {
         id: {
           type: "string",
           description:
-            "Stable kebab-case identifier, e.g. 'sorting-visualizer'. Reuse it to revise that diagram.",
+            "Stable kebab-case identifier, e.g. 'sorting-visualizer'. Reuse it to revise that artifact.",
         },
         title: {
           type: "string",
@@ -447,7 +447,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
           type: "string",
           enum: ["html", "react", "svg", "markdown", "code"],
           description:
-            "html = standalone page; react = interactive component (TSX); svg = vector graphic; markdown = prose document; code = a file shown as highlighted read-only text. Required when creating.",
+            "html = standalone page; react = interactive component (TSX); svg = large/standalone vector deliverable (not a quick chat sketch); markdown = long prose document; code = a file shown as highlighted read-only text. Required when creating.",
         },
         language: {
           type: "string",
@@ -456,7 +456,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
         },
         content: {
           type: "string",
-          description: "The COMPLETE diagram source. Never partial or diffed.",
+          description: "The COMPLETE artifact source. Never partial or diffed.",
         },
       },
       required: ["id", "title", "kind", "content"],
@@ -465,13 +465,13 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
   {
     name: "svg_render",
     description:
-      "Render a transparent line-drawing SVG inline in the chat. Prefer technical diagrams, icons, and geometric compositions over freehand figurative art. Build layered: skeletal/structural lines first, details second. Style: stroke-only on a transparent background (fill='none', stroke='currentColor', no background rects or solid fills). Complete standalone <svg> with a viewBox; no scripts or external references. For large interactive graphics or documents the user will iterate on, use the diagram tool instead. Only call this when a visual genuinely improves the answer.",
+      "Draw a small transparent line-drawing SVG INLINE in the chat to support the explanation — flows, geometry, icons, schematics, concept sketches. Always available; use freely when a quick drawing helps. Prefer geometric/technical forms; skeletal lines before detail. Style: fill='none', stroke='currentColor', no backgrounds. Do NOT use for interactive apps, long documents, full programs, or deliverables the user will iterate on — those are diagram artifacts.",
     input_schema: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Short caption shown under the rendered SVG",
+          description: "Short caption shown under the inline sketch",
         },
         svg: {
           type: "string",
@@ -559,7 +559,7 @@ export function toolEventTitle(
     case "diagram":
       return String(input.title ?? input.id ?? "diagram");
     case "svg_render":
-      return String(input.title ?? "SVG diagram");
+      return String(input.title ?? "Sketch");
     case "memory_add":
       return `"${truncate(String(input.content ?? ""), 72)}"`;
     case "browser_use":
@@ -672,7 +672,7 @@ export async function executeTool(
       };
     }
     case "svg_render": {
-      const title = String(input.title ?? "SVG diagram");
+      const title = String(input.title ?? "Sketch");
       const svg = prepareSvgForChat(String(input.svg ?? ""));
       return {
         // Don't echo the (sanitized) markup back into the model's own

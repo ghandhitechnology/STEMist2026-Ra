@@ -144,8 +144,8 @@ const TOOL_META: Record<ToolName, ToolMeta> = {
   file_read: { label: "Read file", Icon: IconFileRead, monoArg: true },
   file_write: { label: "Write file", Icon: IconFileWrite, monoArg: true },
   skill_make: { label: "Skill maker", Icon: IconSkill, keepExpanded: true },
-  diagram: { label: "Diagram", Icon: IconDiagram, keepExpanded: true },
-  svg_render: { label: "SVG", Icon: IconSvg, keepExpanded: true },
+  diagram: { label: "Artifact", Icon: IconDiagram, keepExpanded: true },
+  svg_render: { label: "Sketch", Icon: IconSvg, keepExpanded: true },
   // toolEventTitle returns the saved sentence (quoted) for memory_add, and
   // the card body below renders that same sentence via `detail` — hideArg
   // keeps it from printing twice in the collapsed header.
@@ -160,8 +160,8 @@ const TOOL_VERBS: Record<ToolName, string> = {
   file_read: "Reading file",
   file_write: "Writing file",
   skill_make: "Authoring skill",
-  diagram: "Building diagram",
-  svg_render: "Drawing",
+  diagram: "Building artifact",
+  svg_render: "Sketching",
   memory_add: "Saving to memory",
   browser_use: "Using the browser",
 };
@@ -580,7 +580,7 @@ function SvgRenderBody({ event }: BodyProps) {
       <div
         className={styles.svgCanvas}
         role="img"
-        aria-label={title || "SVG diagram"}
+        aria-label={title || "Sketch"}
         // Sanitized markup only — see prepareSvgForChat / sanitizeSvg.
         dangerouslySetInnerHTML={{ __html: clean }}
       />

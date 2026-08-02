@@ -58,7 +58,7 @@ const TOOL_CHIPS: Array<{
   { tool: "file_read", label: "Read file", Icon: IconFileRead },
   { tool: "file_write", label: "Write file", Icon: IconFileWrite },
   { tool: "skill_make", label: "Skill maker", Icon: IconSkill },
-  { tool: "svg_render", label: "SVG", Icon: IconSvg },
+  { tool: "svg_render", label: "Sketch", Icon: IconSvg },
   { tool: "browser_use", label: "Browser", Icon: IconBrowser },
 ];
 
@@ -301,18 +301,12 @@ export const Composer = memo(
           // Auto mode was on for this send — set below whenever the prop was
           // already on, or "/auto message" just turned it on for this turn.
           let sendAutoTools = autoTools;
-          // Auto mode: the agent gets every usable tool; research stays a
-          // manual mode (it rewrites the system prompt, not just the tool
-          // set), and svg_render is offered via the autoTools flag itself
-          // (the server derives auto availability from it) rather than the
-          // tool set.
+          // Auto mode: every usable tool. Research stays manual (it rewrites
+          // the system prompt). svg_render is always available server-side;
+          // including it here only leans the prompt toward more sketches.
           if (autoTools) {
             for (const t of TOOL_CHIPS) {
-              if (
-                t.tool !== "research" &&
-                t.tool !== "svg_render" &&
-                !unavailableTools?.[t.tool]
-              ) {
+              if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
                 sendTools.add(t.tool);
               }
             }
@@ -329,11 +323,7 @@ export const Composer = memo(
             if (!autoTools) onToggleAutoTools?.();
             sendAutoTools = true;
             for (const t of TOOL_CHIPS) {
-              if (
-                t.tool !== "research" &&
-                t.tool !== "svg_render" &&
-                !unavailableTools?.[t.tool]
-              ) {
+              if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
                 sendTools.add(t.tool);
               }
             }
