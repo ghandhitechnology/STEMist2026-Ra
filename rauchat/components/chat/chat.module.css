@@ -270,7 +270,9 @@
 .column {
   max-width: var(--rau-measure);
   margin: 0 auto;
-  padding: var(--rau-space-9) var(--rau-space-8) 0;
+  /* Bottom padding clears the composer dock's 24px legibility mask so the
+     finished-turn action bar isn't shaded when pinned to the latest. */
+  padding: var(--rau-space-9) var(--rau-space-8) var(--rau-space-9);
 }
 
 /* Grows the scroll range while a just-sent turn is anchored to the top of
@@ -286,7 +288,7 @@
   margin-bottom: var(--rau-space-9);
 }
 .turn:last-child {
-  margin-bottom: var(--rau-space-2);
+  margin-bottom: 0;
 }
 
 /* Assistant turn --------------------------------------------------- */
@@ -495,29 +497,6 @@
   color: var(--rau-text-tertiary);
 }
 
-/* §8 Long message truncated */
-.clamped {
-  max-height: 1600px;
-  overflow: hidden;
-}
-.clampFooter {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  margin-top: -64px;
-  padding-top: var(--rau-space-10);
-  pointer-events: none;
-  background: linear-gradient(to bottom, transparent, var(--rau-bg-l0) 64px);
-}
-.clampFooter > * {
-  pointer-events: auto;
-}
-.showMoreBtn {
-  composes: ghostBtn;
-  height: 26px;
-  border: var(--rau-hairline) solid var(--rau-border-subtle);
-}
-
 /* §8 Message generation failed */
 .turnError {
   padding: 10px var(--rau-space-5);
@@ -586,8 +565,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 38%;
+  /* Starts a little higher than before so the mark + wordmark + chips
+     still read as one centered block after the logo adds height. */
+  padding-top: 30%;
   text-align: center;
+}
+.emptyLogo {
+  display: block;
+  width: 120px;
+  height: auto;
+  margin-bottom: var(--rau-space-7);
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
 }
 .emptyWordmark {
   font-size: var(--rau-fs-xl);

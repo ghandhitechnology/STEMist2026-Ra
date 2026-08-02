@@ -11,7 +11,14 @@
  * lib/store.ts once the stream settles.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { ChatView, defaultResolveDownloadUrl } from "@/components/chat";
 import type { ComposerSubmission } from "@/components/chat";
 import { TelemetryPanel } from "@/components/telemetry";
@@ -37,6 +44,12 @@ import {
 import { useTelemetry } from "@/lib/useTelemetry";
 import { useAutoTitle, type TitleAnimationMode } from "@/lib/useAutoTitle";
 import { DEFAULT_MODEL_ID, clampThinking, getModel } from "@/lib/models";
+import {
+  TELEMETRY_DEFAULT_WIDTH,
+  TELEMETRY_MIN_WIDTH,
+  clampTelemetryWidth,
+  telemetryMaxWidth,
+} from "@/lib/telemetry-layout";
 import type {
   Diagram,
   Conversation,
@@ -50,6 +63,7 @@ import type {
 } from "@/lib/types";
 
 const TELEMETRY_COLLAPSED_KEY = "rauchat:telemetry-collapsed";
+const TELEMETRY_WIDTH_KEY = "rauchat:telemetry-width";
 const MODEL_CHOICE_KEY = "rauchat:model-choice";
 const AUTO_TOOLS_KEY = "rauchat:auto-tools";
 const DEFAULT_TOOLS: ToolName[] = [];
@@ -142,6 +156,12 @@ export default function Home() {
   }, [refreshAccount]);
 
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
+  const [telemetryWidth, setTelemetryWidth] = useState(
+    TELEMETRY_DEFAULT_WIDTH,
+  );
+  const [telemetryWidthMax, setTelemetryWidthMax] = useState(
+    TELEMETRY_DEFAULT_WIDTH,
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [unavailableTools, setUnavailableTools] = useState<
@@ -201,6 +221,46 @@ export default function Home() {
       );
     } catch {
       // localStorage unavailable — keep the default (expanded).
+    }
+  }, []);
+
+  // Restore the user's instrument width and keep the one-third cap in sync
+  // when the browser itself is resized.
+  useEffect(() => {
+    const viewportWidth = window.innerWidth;
+    setTelemetryWidthMax(telemetryMaxWidth(viewportWidth));
+
+    let restoredWidth = TELEMETRY_DEFAULT_WIDTH;
+    try {
+      const stored = Number(window.localStorage.getItem(TELEMETRY_WIDTH_KEY));
+      if (Number.isFinite(stored) && stored > 0) restoredWidth = stored;
+    } catch {
+      // localStorage unavailable — keep the default width.
+    }
+    setTelemetryWidth(clampTelemetryWidth(restoredWidth, viewportWidth));
+
+    const handleViewportResize = () => {
+      const nextViewportWidth = window.innerWidth;
+      setTelemetryWidthMax(telemetryMaxWidth(nextViewportWidth));
+      setTelemetryWidth((width) =>
+        clampTelemetryWidth(width, nextViewportWidth),
+      );
+    };
+    window.addEventListener("resize", handleViewportResize);
+    return () => window.removeEventListener("resize", handleViewportResize);
+  }, []);
+
+  const resizeTelemetry = useCallback((width: number) => {
+    setTelemetryWidth(clampTelemetryWidth(width, window.innerWidth));
+  }, []);
+
+  const finishTelemetryResize = useCallback((width: number) => {
+    const next = clampTelemetryWidth(width, window.innerWidth);
+    setTelemetryWidth(next);
+    try {
+      window.localStorage.setItem(TELEMETRY_WIDTH_KEY, String(next));
+    } catch {
+      // best-effort persistence
     }
   }, []);
 
@@ -719,9 +779,12 @@ export default function Home() {
   ]
     .filter(Boolean)
     .join(" ");
+  const shellStyle = {
+    "--rau-telemetry-w": `${telemetryWidth}px`,
+  } as CSSProperties;
 
   return (
-    <div className={shellClass}>
+    <div className={shellClass} style={shellStyle}>
       <Sidebar
         store={store}
         onOpenSkills={() => setSkillsOpen(true)}
@@ -754,7 +817,6 @@ export default function Home() {
             ? () => handleTitleAnimationEnd(store.activeId!)
             : undefined
         }
-        assistantName="Rauchat"
         telemetryOpen={!telemetryCollapsed}
         onToggleTelemetry={toggleTelemetry}
         onBranchConversation={handleBranchConversation}
@@ -790,6 +852,11 @@ export default function Home() {
         latencyMs={telemetry.latencyMs}
         error={telemetry.error}
         onRetry={telemetry.retry}
+        width={telemetryWidth}
+        minWidth={TELEMETRY_MIN_WIDTH}
+        maxWidth={telemetryWidthMax}
+        onResize={resizeTelemetry}
+        onResizeEnd={finishTelemetryResize}
       />
 
       <SkillsModal

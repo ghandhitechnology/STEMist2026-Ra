@@ -5,7 +5,7 @@
  *
  * The expandable model selector that sits beside the conversation title in the
  * chat top bar (DESIGN.md §3.4). Resting state is a quiet ghost trigger showing
- * the active model's shortLabel plus its thinking level ("Luna · Max");
+ * the active model's shortLabel plus its thinking level ("GPT 5.6 Luna · Max");
  * clicking expands a §4.10 popover listing every
  * model in lib/models.ts grouped by family, plus a continuous thinking slider
  * that snaps to the active model's supported levels.

@@ -8,10 +8,11 @@
  * scrolls up, follow detaches and the "Jump to latest" pill appears.
  *
  * Sending a message anchors it to the top of the viewport (ChatGPT-style):
- * a tail spacer grows the scroll range so the turn can reach the top, the
- * streamed reply (thinking included) fills the space below, and auto-follow
- * stays off for the run so nothing slides under the composer. The spacer
- * shrinks as the reply grows and is trimmed once the run ends.
+ * a tail spacer grows the scroll range so the turn can reach the top and the
+ * streamed reply fills the space below. Once the reply overflows the
+ * viewport, auto-follow keeps the streaming tail in view until the user
+ * scrolls away. The spacer shrinks as the reply grows and is trimmed once
+ * the run ends.
  */
 
 import {
@@ -94,6 +95,22 @@ export const MessageList = memo(function MessageList({
     return anchor;
   }, []);
 
+  const spacerHeight = useCallback(() => {
+    const spacer = spacerRef.current;
+    if (!spacer) return 0;
+    return parseFloat(spacer.style.height) || 0;
+  }, []);
+
+  /* Keep the streaming tail in view while pinned. During the initial
+     anchor phase the spacer still has height, so stay put until the reply
+     fills the viewport — then follow scrollHeight. */
+  const followTailIfPinned = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el || !pinnedRef.current) return;
+    if (anchoredRef.current && spacerHeight() > 0) return;
+    el.scrollTop = el.scrollHeight;
+  }, [spacerHeight]);
+
   /* A new turn adjusts scroll (declared first so it wins the layout pass):
      a just-sent user message anchors to the top of the viewport; anything
      else (conversation switch, history load) re-pins to the tail. */
@@ -105,13 +122,13 @@ export const MessageList = memo(function MessageList({
 
     if (appended && last?.role === "user") {
       anchoredRef.current = true;
-      pinnedRef.current = false;
+      pinnedRef.current = true;
       setDetached(false);
       const el = scrollerRef.current;
       const anchor = sizeAnchorSpacer();
       if (el && anchor) el.scrollTop = anchor.offsetTop - ANCHOR_TOP;
     } else if (anchoredRef.current && last?.role === "assistant") {
-      // The streamed turn just committed: hold the anchored position.
+      // The streamed turn just committed: hold follow/pin state as-is.
     } else {
       anchoredRef.current = false;
       if (spacerRef.current) spacerRef.current.style.height = "0px";
@@ -123,30 +140,41 @@ export const MessageList = memo(function MessageList({
   /* Follow the tail on every commit while pinned (no dep array: streaming
      text mutates content, not identity of anything we could depend on). */
   useLayoutEffect(() => {
-    const el = scrollerRef.current;
-    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
+    followTailIfPinned();
   });
 
-  /* Async growth (markdown, images, tool bodies) keeps the tail pinned,
-     or — while anchored — shrinks the spacer as the reply grows into it. */
+  /* Async growth (markdown, images, tool bodies, smooth text) keeps the
+     tail pinned, and — while anchored — shrinks the spacer as the reply
+     grows into it before following. */
   useEffect(() => {
     const el = scrollerRef.current;
     const col = columnRef.current;
     if (!el || !col || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => {
       if (anchoredRef.current) sizeAnchorSpacer();
-      else if (pinnedRef.current) el.scrollTop = el.scrollHeight;
+      followTailIfPinned();
     });
     ro.observe(col);
     return () => ro.disconnect();
-  }, [sizeAnchorSpacer]);
+  }, [sizeAnchorSpacer, followTailIfPinned]);
 
   const handleScroll = useCallback(() => {
     const el = scrollerRef.current;
     if (!el) return;
-    /* While anchored the run's scroll is free-form: no pin takeover, no
-       pill (the spacer would make the "latest" target blank space). */
-    if (!anchoredRef.current) {
+
+    /* While the anchor spacer still has room, distance-to-bottom is
+       misleading (it points at empty spacer). Only detach if the user
+       scrolls up away from the anchored user turn. Once the spacer is
+       spent, normal pin/detach applies so streaming can be followed. */
+    if (anchoredRef.current && spacerHeight() > PIN_THRESHOLD) {
+      const col = columnRef.current;
+      const userTurns = col?.querySelectorAll<HTMLElement>('[data-role="user"]');
+      const anchor = userTurns?.[userTurns.length - 1];
+      if (anchor && el.scrollTop < anchor.offsetTop - ANCHOR_TOP - PIN_THRESHOLD) {
+        pinnedRef.current = false;
+        setDetached(true);
+      }
+    } else {
       const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
       const pinned = distance <= PIN_THRESHOLD;
       pinnedRef.current = pinned;
@@ -158,7 +186,7 @@ export const MessageList = memo(function MessageList({
       scrolledRef.current = scrolled;
       onScrolledChange?.(scrolled);
     }
-  }, [onScrolledChange]);
+  }, [onScrolledChange, spacerHeight]);
 
   /* The run ended: release the anchor and trim the spacer to the viewport
      bottom (no visual jump), then let the pin machinery take over again. */
@@ -191,6 +219,14 @@ export const MessageList = memo(function MessageList({
         <div className={styles.column} ref={columnRef} role="log">
           {isEmpty ? (
             <div className={styles.emptyState}>
+              <img
+                className={styles.emptyLogo}
+                src="/brand/rau-hippo.png"
+                alt=""
+                width={120}
+                height={120}
+                draggable={false}
+              />
               <div className={`${styles.wordmark} ${styles.emptyWordmark}`}>
                 Rau<span className={styles.wordmarkTail}>chat</span>
               </div>

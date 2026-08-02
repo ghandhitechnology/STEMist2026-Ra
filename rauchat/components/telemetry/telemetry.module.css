@@ -6,6 +6,8 @@
 /* ---------- shell ---------- */
 
 .panel {
+  position: relative;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -19,6 +21,42 @@
   box-sizing: border-box;
   background: var(--rau-bg-l1);
   border-left: var(--rau-hairline) solid var(--rau-border-subtle);
+}
+
+.resizeHandle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 7px;
+  touch-action: none;
+  cursor: col-resize;
+  outline: none;
+}
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: transparent;
+  transition: background-color var(--rau-dur-slow) var(--rau-ease-standard);
+}
+.resizeHandle:hover::after {
+  background: var(--rau-border-strong);
+  transition-delay: 200ms;
+}
+.resizeHandle:focus-visible::after,
+.panelResizing .resizeHandle::after {
+  background: var(--rau-border-loud);
+  transition-delay: 0ms;
+}
+.panelResizing,
+.panelResizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 .header {
@@ -496,7 +534,7 @@
 .radarSvg {
   display: block;
   width: 100%;
-  max-width: 260px;
+  max-width: 320px;
   height: auto;
   overflow: visible;
 }
@@ -907,6 +945,19 @@
 .histSurface {
   position: relative;
   cursor: crosshair;
+}
+
+/* Wider telemetry keeps its dense instrument layout but lets every plot use
+   the newly available measure instead of holding onto the 320px geometry. */
+@container (min-width: 400px) {
+  .section {
+    padding-right: var(--rau-space-7);
+    padding-left: var(--rau-space-7);
+  }
+
+  .radarSvg {
+    max-width: 360px;
+  }
 }
 
 /* stacked (dense) mode */

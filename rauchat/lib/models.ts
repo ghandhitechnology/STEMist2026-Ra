@@ -63,8 +63,8 @@ export const MODELS: ModelInfo[] = [
   {
     id: "gpt-5.6-sol",
     openrouterId: "openai/gpt-5.6-sol",
-    label: "GPT-5.6 Sol",
-    shortLabel: "Sol",
+    label: "GPT 5.6 Sol",
+    shortLabel: "GPT 5.6 Sol",
     family: "openai",
     description: "OpenAI's flagship generalist.",
     thinkingLevels: ["minimal", "low", "medium", "high", "xhigh", "max"],
@@ -73,8 +73,8 @@ export const MODELS: ModelInfo[] = [
   {
     id: "gpt-5.6-luna",
     openrouterId: "openai/gpt-5.6-luna",
-    label: "GPT-5.6 Luna",
-    shortLabel: "Luna",
+    label: "GPT 5.6 Luna",
+    shortLabel: "GPT 5.6 Luna",
     family: "openai",
     description: "Fast and light; also names your chats.",
     thinkingLevels: ["minimal", "low", "medium", "high", "xhigh", "max"],
@@ -83,8 +83,8 @@ export const MODELS: ModelInfo[] = [
   {
     id: "gpt-5.6-terra",
     openrouterId: "openai/gpt-5.6-terra",
-    label: "GPT-5.6 Terra",
-    shortLabel: "Terra",
+    label: "GPT 5.6 Terra",
+    shortLabel: "GPT 5.6 Terra",
     family: "openai",
     description: "Long-horizon reasoning specialist.",
     thinkingLevels: ["minimal", "low", "medium", "high", "xhigh", "max"],

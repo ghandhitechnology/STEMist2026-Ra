@@ -56,6 +56,7 @@ export type ChatViewProps = {
   /** Animate the header title (auto-naming): 'type' on first naming, 'retype' on regeneration. */
   titleAnimate?: TitleAnimateMode;
   onTitleAnimationEnd?: () => void;
+  /** Override for the assistant turn label. Defaults to the active model shortLabel. */
   assistantName?: string;
   telemetryOpen?: boolean;
   onToggleTelemetry?: () => void;
@@ -180,8 +181,11 @@ export const ChatView = memo(function ChatView({
   // The selector is driven by explicit props first, then by whatever the
   // conversation was created with, then by the catalog default.
   const activeModelId = modelId ?? conversation?.modelId ?? DEFAULT_MODEL_ID;
+  const activeModel = getModel(activeModelId);
   const activeThinking =
-    thinking ?? conversation?.thinking ?? getModel(activeModelId).defaultThinking;
+    thinking ?? conversation?.thinking ?? activeModel.defaultThinking;
+  // Assistant turn chrome shows the model name + time (not the product name).
+  const resolvedAssistantName = assistantName ?? activeModel.shortLabel;
 
   return (
     <div className={styles.chat}>
@@ -266,7 +270,7 @@ export const ChatView = memo(function ChatView({
           isStreaming={isStreaming}
           error={error}
           onRetry={onRetry}
-          assistantName={assistantName}
+          assistantName={resolvedAssistantName}
           suggestions={suggestions}
           onSuggestionSelect={handleSuggestion}
           onScrolledChange={handleScrolledChange}

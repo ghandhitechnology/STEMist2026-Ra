@@ -13,7 +13,14 @@
  * component only derives per-axis state (latest reading, delta, staleness).
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   TRAIT_AXES,
   type TelemetryStatus,
@@ -50,6 +57,12 @@ export type TelemetryPanelProps = {
   onRetry?: () => void;
   /** Click a turn in the history → scroll the transcript to it. */
   onSelectTurn?: (turnIndex: number) => void;
+  /** Expanded panel sizing, owned by the app shell grid. */
+  width?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  onResize?: (width: number) => void;
+  onResizeEnd?: (width: number) => void;
 };
 
 const TRAIT_ORDER: TraitId[] = [
@@ -96,6 +109,11 @@ export function TelemetryPanel({
   error,
   onRetry,
   onSelectTurn,
+  width = 320,
+  minWidth = 288,
+  maxWidth = 440,
+  onResize,
+  onResizeEnd,
 }: TelemetryPanelProps) {
   const hasData = snapshots.length > 0;
   const dormant = !hasData && status !== "live";
@@ -106,6 +124,66 @@ export function TelemetryPanel({
   );
 
   const [axisView, setAxisView] = useState<AxisView>("bars");
+  const [resizing, setResizing] = useState(false);
+  const resizeRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startWidth: number;
+    latestWidth: number;
+  } | null>(null);
+
+  const clampWidth = (candidate: number) =>
+    Math.min(maxWidth, Math.max(minWidth, Math.round(candidate)));
+
+  const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!onResize) return;
+    event.preventDefault();
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
+    resizeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: width,
+      latestWidth: width,
+    };
+    setResizing(true);
+  };
+
+  const handleResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = resizeRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !onResize) return;
+    // The divider is on the panel's left: moving it left grows the panel.
+    const next = clampWidth(drag.startWidth + drag.startX - event.clientX);
+    drag.latestWidth = next;
+    onResize(next);
+  };
+
+  const handleResizeFinish = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = resizeRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resizeRef.current = null;
+    setResizing(false);
+    onResizeEnd?.(drag.latestWidth);
+  };
+
+  const handleResizeKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!onResize) return;
+    const step = event.shiftKey ? 16 : 8;
+    let next: number | null = null;
+    if (event.key === "ArrowLeft") next = width + step;
+    if (event.key === "ArrowRight") next = width - step;
+    if (event.key === "Home") next = minWidth;
+    if (event.key === "End") next = maxWidth;
+    if (next === null) return;
+    event.preventDefault();
+    const clamped = clampWidth(next);
+    onResize(clamped);
+    onResizeEnd?.(clamped);
+  };
+
   useEffect(() => {
     const stored = window.localStorage.getItem(AXIS_VIEW_KEY);
     if (stored === "bars" || stored === "radar") setAxisView(stored);
@@ -153,10 +231,27 @@ export function TelemetryPanel({
 
   return (
     <aside
-      className={s.panel}
+      className={`${s.panel} ${resizing ? s.panelResizing : ""}`}
       role="complementary"
       aria-label="Model telemetry"
     >
+      <div
+        className={s.resizeHandle}
+        role="separator"
+        tabIndex={0}
+        aria-label="Resize model telemetry"
+        aria-orientation="vertical"
+        aria-valuemin={minWidth}
+        aria-valuemax={maxWidth}
+        aria-valuenow={Math.round(width)}
+        aria-valuetext={`${Math.round(width)} pixels wide`}
+        title="Drag to resize model telemetry"
+        onPointerDown={handleResizeStart}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeFinish}
+        onPointerCancel={handleResizeFinish}
+        onKeyDown={handleResizeKey}
+      />
       <header className={s.header}>
         <h2 className={s.headerTitle}>Model telemetry</h2>
         <span className={s.headerStatus}>
