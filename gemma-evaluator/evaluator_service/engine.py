@@ -33,16 +33,23 @@ class GemmaEvaluator:
         self.model: Any | None = None
         self.device: torch.device | None = None
         self.unit_vectors: torch.Tensor | None = None
-        self.decision_threshold: torch.Tensor | None = None
-        self.score_scale: torch.Tensor | None = None
+        # Calibration tensors keyed by chat-model id; None is the default
+        # table (artifact values plus any "default" recenter overrides).
+        self.calibrations: dict[str | None, tuple[torch.Tensor, torch.Tensor]] = {}
         self.recentered_traits: list[str] = []
-        unknown = set(settings.trait_recenter) - {
-            axis.trait_id for axis in bundle.axes
-        }
-        if unknown:
-            raise RuntimeError(
-                f"TRAIT_RECENTER_JSON names unknown traits: {sorted(unknown)}"
-            )
+        self.model_calibrations: list[str] = []
+        known = {axis.trait_id for axis in bundle.axes}
+        default_table = settings.trait_recenter["default"]
+        model_tables = settings.trait_recenter["models"]
+        for label, table in [("default", default_table)] + list(
+            model_tables.items()
+        ):
+            unknown = set(table) - known
+            if unknown:
+                raise RuntimeError(
+                    f"TRAIT_RECENTER_JSON {label} names unknown traits: "
+                    f"{sorted(unknown)}"
+                )
         self.status = "loading"
         self.detail = "waiting for model load"
         self._load_lock = threading.Lock()
@@ -75,28 +82,37 @@ class GemmaEvaluator:
                 self.model = model
                 self.device = device
                 self.unit_vectors = self.bundle.unit_vectors.float().to(device)
-                overrides = self.settings.trait_recenter
-                self.decision_threshold = torch.tensor(
-                    [
-                        overrides.get(axis.trait_id, {}).get(
-                            "threshold", axis.decision_threshold
-                        )
-                        for axis in self.bundle.axes
-                    ],
-                    dtype=torch.float32,
-                    device=device,
-                )
-                self.score_scale = torch.tensor(
-                    [
-                        overrides.get(axis.trait_id, {}).get(
-                            "scale", axis.score_scale
-                        )
-                        for axis in self.bundle.axes
-                    ],
-                    dtype=torch.float32,
-                    device=device,
-                )
-                self.recentered_traits = sorted(overrides)
+                default_table = self.settings.trait_recenter["default"]
+                model_tables = self.settings.trait_recenter["models"]
+
+                def build(table: dict) -> tuple[torch.Tensor, torch.Tensor]:
+                    thresholds = torch.tensor(
+                        [
+                            table.get(axis.trait_id, {}).get(
+                                "threshold", axis.decision_threshold
+                            )
+                            for axis in self.bundle.axes
+                        ],
+                        dtype=torch.float32,
+                        device=device,
+                    )
+                    scales = torch.tensor(
+                        [
+                            table.get(axis.trait_id, {}).get(
+                                "scale", axis.score_scale
+                            )
+                            for axis in self.bundle.axes
+                        ],
+                        dtype=torch.float32,
+                        device=device,
+                    )
+                    return thresholds, scales
+
+                self.calibrations = {None: build(default_table)}
+                for model_id, table in model_tables.items():
+                    self.calibrations[model_id] = build(table)
+                self.recentered_traits = sorted(default_table)
+                self.model_calibrations = sorted(model_tables)
                 self.status = "ready"
                 self.detail = "model and vectors loaded"
             except Exception as exc:
@@ -105,13 +121,17 @@ class GemmaEvaluator:
                 raise
 
     @torch.inference_mode()
-    def project(self, prompt: str, response: str) -> dict[str, Any]:
+    def project(
+        self, prompt: str, response: str, model: str | None = None
+    ) -> dict[str, Any]:
         if self.status != "ready" or self.model is None or self.processor is None:
             raise RuntimeError("Evaluator is not ready.")
         if self.device is None or self.unit_vectors is None:
             raise RuntimeError("Evaluator tensors are not initialized.")
-        if self.decision_threshold is None or self.score_scale is None:
+        if not self.calibrations:
             raise RuntimeError("Evaluator score scaling is not initialized.")
+        calibration_key = model if model in self.calibrations else None
+        decision_threshold, score_scale = self.calibrations[calibration_key]
 
         started = time.perf_counter()
         full_ids, response_start, response_end, truncated = self._render_ids(
@@ -139,7 +159,7 @@ class GemmaEvaluator:
 
         raw_scores = torch.mv(self.unit_vectors, activation)
         signed_scores = torch.tanh(
-            (raw_scores - self.decision_threshold) / self.score_scale
+            (raw_scores - decision_threshold) / score_scale
         )
         readings = [
             {
@@ -167,6 +187,7 @@ class GemmaEvaluator:
                 "truncated": truncated,
                 "rawScores": raw_by_trait,
                 "recenteredTraits": self.recentered_traits,
+                "calibration": calibration_key or "default",
                 "latencyMs": round((time.perf_counter() - started) * 1000),
             },
         }

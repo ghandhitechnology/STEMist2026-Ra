@@ -395,6 +395,7 @@ export async function POST(req: NextRequest) {
         {
           prompt: buildTraitEvaluationPrompt(messages, traitEvidence),
           response: finalAssistantText,
+          model: model.openrouterId,
         },
         messages.length
       );

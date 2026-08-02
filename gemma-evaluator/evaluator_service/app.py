@@ -19,6 +19,9 @@ class ProjectRequest(BaseModel):
 
     prompt: str = Field(min_length=1, max_length=50_000)
     response: str = Field(min_length=1, max_length=50_000)
+    # Chat-model id that produced the response; selects a per-model
+    # calibration table when one is configured, else the default applies.
+    model: str | None = Field(default=None, max_length=200)
 
 
 @asynccontextmanager
@@ -78,6 +81,7 @@ async def health(
         "detail": engine.detail,
         "warnings": engine.bundle.warnings,
         "recenteredTraits": engine.recentered_traits,
+        "modelCalibrations": engine.model_calibrations,
     }
     return JSONResponse(payload, status_code=200 if engine.status == "ready" else 503)
 
@@ -97,7 +101,9 @@ async def project(
         )
     try:
         async with request.app.state.inference_gate:
-            return await asyncio.to_thread(engine.project, body.prompt, body.response)
+            return await asyncio.to_thread(
+                engine.project, body.prompt, body.response, body.model
+            )
     except ProjectionInputError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

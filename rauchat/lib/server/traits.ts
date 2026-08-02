@@ -81,6 +81,12 @@ export type TraitProjectionInput = {
   prompt: string;
   /** Completed assistant response whose response-token activations are projected. */
   response: string;
+  /**
+   * OpenRouter id of the chat model that produced the response. The evaluator
+   * selects a matching per-model calibration table and falls back to its
+   * default table when omitted or unknown.
+   */
+  model?: string;
 };
 
 function endpointHeaders(extra?: Record<string, string>): Record<string, string> {
