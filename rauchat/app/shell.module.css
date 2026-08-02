@@ -1,38 +1,79 @@
-/* App shell grid (§3.1). Side-track widths animate via registered <length>
-   custom properties so only those tracks interpolate — never the full
-   `grid-template-columns` list (which mis-distributes free space into the
-   telemetry column while the sidebar expands). */
+/* App shell grid (§3.1).
+   Side tracks use discrete class combinations with literal lengths — never
+   transition `grid-template-columns` (browsers mis-allocate free space into
+   the telemetry column while the sidebar width changes). */
 
 .shell {
-  --rau-shell-sidebar: var(--rau-sidebar-w);
-  --rau-shell-telemetry: var(--rau-telemetry-w);
   display: grid;
   grid-template-columns:
-    var(--rau-shell-sidebar)
+    var(--rau-sidebar-w)
     minmax(0, 1fr)
-    var(--rau-shell-telemetry);
+    var(--rau-telemetry-w);
   grid-template-rows: minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
-  transition:
-    --rau-shell-sidebar var(--rau-dur-slow) var(--rau-ease-inout),
-    --rau-shell-telemetry var(--rau-dur-slow) var(--rau-ease-inout);
 }
 
+/* Grid items default to min-width:auto (content-sized). That lets the
+   telemetry axis labels expand the right track past 320px when the sidebar
+   column changes. Force both side columns to respect the track. */
+.shell > * {
+  min-width: 0;
+}
+
+/* ---- 3-column (no diagram) ---- */
+
 .sidebarCollapsed {
-  --rau-shell-sidebar: var(--rau-sidebar-w-collapsed);
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    var(--rau-telemetry-w);
 }
 
 .telemetryCollapsed {
-  --rau-shell-telemetry: var(--rau-telemetry-w-rail);
+  grid-template-columns:
+    var(--rau-sidebar-w)
+    minmax(0, 1fr)
+    var(--rau-telemetry-w-rail);
 }
 
-/* Diagram column is inserted between chat and telemetry; structure changes
-   are discrete (no width interpolation across a different track count). */
+.sidebarCollapsed.telemetryCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    var(--rau-telemetry-w-rail);
+}
+
+/* ---- 4-column (diagram open) ---- */
+
 .withDiagram {
   grid-template-columns:
-    var(--rau-shell-sidebar)
+    var(--rau-sidebar-w)
     minmax(0, 1fr)
     minmax(0, clamp(380px, 42%, 760px))
-    var(--rau-shell-telemetry);
+    var(--rau-telemetry-w);
+}
+
+.withDiagram.sidebarCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-telemetry-w);
+}
+
+.withDiagram.telemetryCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-telemetry-w-rail);
+}
+
+.withDiagram.sidebarCollapsed.telemetryCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-telemetry-w-rail);
 }

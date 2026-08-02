@@ -169,19 +169,6 @@
   --rau-z-modal: 60; --rau-z-toast: 80;
 }
 
-/* Registered so the shell can interpolate sidebar/telemetry track widths
-   without transitioning the entire `grid-template-columns` value list. */
-@property --rau-shell-sidebar {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 264px;
-}
-@property --rau-shell-telemetry {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 320px;
-}
-
 /* ============================================================
    Base styles
    ============================================================ */

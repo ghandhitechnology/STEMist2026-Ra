@@ -13,7 +13,10 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
+  /* Pin to the shell track — never let axis/chart min-content widen the column. */
   overflow: hidden;
+  justify-self: stretch;
+  box-sizing: border-box;
   background: var(--rau-bg-l1);
   border-left: var(--rau-hairline) solid var(--rau-border-subtle);
 }

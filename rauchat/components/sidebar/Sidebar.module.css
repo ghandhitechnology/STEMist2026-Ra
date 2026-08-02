@@ -2,14 +2,17 @@
   height: 100%;
   min-height: 0;
   min-width: 0;
+  max-width: 100%;
   background: var(--rau-bg-l1);
   border-right: 1px solid var(--rau-border-subtle);
   display: flex;
   flex-direction: column;
-  /* Fill the shell's animated sidebar track; do not set an independent
-     pixel width that fights the grid (that was stretching telemetry). */
+  /* Fill the shell track. Width animation lives on the grid track classes
+     in shell.module.css — keeping a second pixel width here reflow-fights
+     the telemetry column. */
   width: 100%;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* The rail is the same surface, just narrower — it must keep the bg-l1 fill,
@@ -293,18 +296,6 @@
 
 .sidebarCollapsed .railIcons {
   display: flex;
-}
-
-/* ---- Peek overlay when hovering a collapsed rail ---- */
-
-.peekOverlay {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: var(--rau-sidebar-w);
-  z-index: var(--rau-z-popover);
-  box-shadow: var(--rau-elev-popover);
 }
 
 /* ---- Workspace section ---- */

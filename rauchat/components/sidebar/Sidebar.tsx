@@ -6,7 +6,7 @@
  * as `store` so the parent owns the single source of truth.
  */
 
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import type { UseConversations } from "@/lib/store";
 import { accountInitials, type Account } from "../modals/AccountModal";
 import {
@@ -36,9 +36,6 @@ function groupLabel(updatedAt: number): string {
   if (diffDays <= 7) return "Previous 7 days";
   return "Older";
 }
-
-const PEEK_OPEN_DELAY_MS = 400;
-const PEEK_CLOSE_DELAY_MS = 200;
 
 export type SidebarProps = {
   store: UseConversations;
@@ -75,10 +72,7 @@ export function Sidebar({
   onCollapsedChange,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [peeking, setPeeking] = useState(false);
   const [query, setQuery] = useState("");
-  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const streamingSet = useMemo(
     () => new Set(streamingConversationIds ?? []),
@@ -101,24 +95,6 @@ export function Sidebar({
     );
   }, [store.conversations, query]);
 
-  function handleRailEnter() {
-    if (!collapsed) return;
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-    if (peeking) return;
-    openTimer.current = setTimeout(() => setPeeking(true), PEEK_OPEN_DELAY_MS);
-  }
-
-  function handleRailLeave() {
-    if (openTimer.current) {
-      clearTimeout(openTimer.current);
-      openTimer.current = null;
-    }
-    closeTimer.current = setTimeout(() => setPeeking(false), PEEK_CLOSE_DELAY_MS);
-  }
-
   function handleSearchChange(event: ChangeEvent<HTMLInputElement>) {
     setQuery(event.target.value);
   }
@@ -129,26 +105,12 @@ export function Sidebar({
     onCollapsedChange?.(next);
   }
 
-  const showExpanded = !collapsed || peeking;
-
-  // Three shapes, no inline styles: the 56px rail, the same rail peeked open
-  // as a fixed overlay (§3.3), and the resting 264px panel.
-  const asideClass = collapsed
-    ? peeking
-      ? `${styles.sidebar} ${styles.peekOverlay}`
-      : styles.sidebarCollapsed
-    : styles.sidebar;
-
   let lastGroup: string | null = null;
 
   return (
-    <aside
-      className={asideClass}
-      onMouseEnter={handleRailEnter}
-      onMouseLeave={handleRailLeave}
-    >
+    <aside className={collapsed ? styles.sidebarCollapsed : styles.sidebar}>
       <div className={styles.header}>
-        {showExpanded && (
+        {!collapsed && (
           <div className={styles.wordmark}>
             <span className={styles.notch} />
             <span className={styles.wordmarkRau}>Rau</span>
@@ -176,7 +138,7 @@ export function Sidebar({
         </button>
       </div>
 
-      {showExpanded && (
+      {!collapsed && (
         <div className={styles.searchWrap}>
           <div className={styles.searchRow}>
             <IconSearch size={14} className={styles.searchIcon} />
@@ -192,7 +154,7 @@ export function Sidebar({
         </div>
       )}
 
-      {showExpanded && (
+      {!collapsed && (
         <div className={styles.list}>
           {!store.hydrated &&
             SKELETON_WIDTHS.map((w, i) => (
