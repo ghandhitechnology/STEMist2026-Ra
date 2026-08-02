@@ -79,15 +79,34 @@ export async function createSkill(
     name: string;
     description: string;
     instructions: string;
+    source?: NonNullable<Skill["source"]>;
+    sourceDraftId?: string;
+    capabilities?: Skill["capabilities"];
   }
 ): Promise<Skill> {
   await ensureWorkspaceDirs(userId);
+
+  // Replaying an old generated-draft card must return the skill that was
+  // already installed rather than creating duplicates.
+  if (input.sourceDraftId) {
+    const existing = (await listSkills(userId)).find(
+      (skill) => skill.sourceDraftId === input.sourceDraftId
+    );
+    if (existing) return existing;
+  }
+
   const skill: Skill = {
     id: randomUUID(),
     name: input.name,
     description: input.description,
     instructions: input.instructions,
     createdAt: Date.now(),
+    source: input.source ?? "manual",
+    ...(input.sourceDraftId ? { sourceDraftId: input.sourceDraftId } : {}),
+    capabilities: {
+      tools: input.capabilities?.tools ?? [],
+      skills: input.capabilities?.skills ?? [],
+    },
   };
   await writeFile(
     skillFilePath(userId, skill.id),
@@ -100,7 +119,9 @@ export async function createSkill(
 export async function updateSkill(
   userId: string,
   id: string,
-  patch: Partial<Pick<Skill, "name" | "description" | "instructions" | "autoLoad">>
+  patch: Partial<
+    Pick<Skill, "name" | "description" | "instructions" | "autoLoad" | "capabilities">
+  >
 ): Promise<Skill | null> {
   const existing = await getSkill(userId, id);
   if (!existing) return null;
@@ -112,6 +133,38 @@ export async function updateSkill(
 /** Skills flagged autoLoad — injected into every conversation. */
 export async function listAutoLoadSkills(userId: string): Promise<Skill[]> {
   return (await listSkills(userId)).filter((s) => s.autoLoad);
+}
+
+/**
+ * Expands root skills through their declared skill capabilities. Dependencies
+ * are returned before the skill that requested them, duplicates are removed,
+ * missing ids are ignored, and cycles terminate safely.
+ */
+export async function resolveSkills(
+  userId: string,
+  rootIds: readonly string[]
+): Promise<Skill[]> {
+  const installed = await listSkills(userId);
+  const byId = new Map(installed.map((skill) => [skill.id, skill]));
+  const visiting = new Set<string>();
+  const resolved = new Set<string>();
+  const ordered: Skill[] = [];
+
+  const visit = (id: string) => {
+    if (resolved.has(id) || visiting.has(id)) return;
+    const skill = byId.get(id);
+    if (!skill) return;
+    visiting.add(id);
+    for (const dependencyId of skill.capabilities?.skills ?? []) {
+      visit(dependencyId);
+    }
+    visiting.delete(id);
+    resolved.add(id);
+    ordered.push(skill);
+  };
+
+  for (const id of rootIds) visit(id);
+  return ordered;
 }
 
 export async function deleteSkill(userId: string, id: string): Promise<boolean> {

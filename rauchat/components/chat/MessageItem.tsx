@@ -31,7 +31,7 @@ export type MessageActions = {
   onFeedback?: (message: Message, value: "good" | "bad" | null) => void;
   onMore?: (message: Message, anchor: HTMLElement) => void;
   onRetryToolEvent?: (event: ToolEvent) => void;
-  onInstallSkill?: (event: ToolEvent) => void;
+  onInstallSkill?: (event: ToolEvent) => void | Promise<void>;
   /** Opens a diagram produced in this turn in the side panel. */
   onOpenDiagram?: (diagram: Diagram) => void;
   /** Id of the open diagram, so its inline card reads as active. */

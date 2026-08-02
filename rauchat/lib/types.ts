@@ -137,6 +137,24 @@ export type Skill = {
   description: string;
   instructions: string;
   createdAt: number;
+  /** How this skill entered the library. Missing on legacy skills. */
+  source?: "manual" | "generated" | "imported";
+  /** Idempotency key carried by a reviewed model-generated draft. */
+  sourceDraftId?: string;
+  /** Tools and other installed skills made available when this skill runs. */
+  capabilities?: {
+    tools: ToolName[];
+    skills: string[];
+  };
   /** Auto-loaded into every conversation without being selected in the picker. */
   autoLoad?: boolean;
+};
+
+export type SkillDraft = Pick<
+  Skill,
+  "name" | "description" | "instructions" | "capabilities"
+> & {
+  draftId: string;
+  source: "generated";
+  status: "draft";
 };

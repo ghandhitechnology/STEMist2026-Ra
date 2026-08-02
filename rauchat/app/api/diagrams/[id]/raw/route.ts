@@ -46,7 +46,7 @@ export async function GET(
           "Cache-Control": "no-store",
           // Opaque origin: scripts run, but the page is not "us".
           "Content-Security-Policy":
-            "sandbox allow-scripts allow-forms allow-popups allow-modals",
+            "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-pointer-lock allow-presentation",
         },
       }
     );

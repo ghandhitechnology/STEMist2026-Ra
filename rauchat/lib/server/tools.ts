@@ -5,13 +5,13 @@
  * app/api/chat/route.ts's agentic tool loop.
  */
 
+import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
-import type { ToolName } from "@/lib/types";
+import type { SkillDraft, ToolName } from "@/lib/types";
 import { writeDiagram } from "./diagrams";
 import { appendMemory } from "./memory";
-import { createSkill } from "./skills";
 import {
   ensureWorkspaceDirs,
   readWorkspaceFile,
@@ -265,12 +265,31 @@ export async function fileWrite(
 // ---------------------------------------------------------------------------
 
 export async function skillMake(
-  userId: string,
   name: string,
   description: string,
-  instructions: string
-) {
-  return createSkill(userId, { name, description, instructions });
+  instructions: string,
+  capabilities?: SkillDraft["capabilities"]
+): Promise<SkillDraft> {
+  const cleanName = name.trim();
+  const cleanDescription = description.trim();
+  const cleanInstructions = instructions.trim();
+  if (!cleanName || !cleanDescription || !cleanInstructions) {
+    throw new Error("Skill drafts require a name, description, and instructions.");
+  }
+  // Deliberately not persisted: the transcript renders this draft for review,
+  // and installation happens only after the user confirms it.
+  return {
+    draftId: randomUUID(),
+    source: "generated",
+    status: "draft",
+    name: cleanName,
+    description: cleanDescription,
+    instructions: cleanInstructions,
+    capabilities: {
+      tools: capabilities?.tools ?? [],
+      skills: capabilities?.skills ?? [],
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +383,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
   {
     name: "skill_make",
     description:
-      "Persist a new reusable skill (name, description, and instructions) to the workspace skills library, so it can be enabled on future conversations.",
+      "Draft a reusable skill for the user to review. This does not install or persist the skill; the user confirms installation from the draft card.",
     input_schema: {
       type: "object",
       properties: {
@@ -377,6 +396,29 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
           type: "string",
           description: "The full instructions the model should follow when this skill is active.",
         },
+        tools: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "web_search",
+              "research",
+              "pdf_create",
+              "file_read",
+              "file_write",
+              "skill_make",
+              "diagram",
+              "memory_add",
+            ],
+          },
+          description: "Tool capabilities this skill needs when active.",
+        },
+        skills: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional installed skill names or ids this skill depends on.",
+        },
       },
       required: ["name", "description", "instructions"],
     },
@@ -384,7 +426,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
   {
     name: "diagram",
     description:
-      "Create or revise a self-contained document that the user views and interacts with in a dedicated panel: an interactive React component, a standalone HTML page, an SVG graphic, a long markdown document, or a code file. Use this for anything substantial the user will read, run, reuse, or iterate on — apps, visualizations, charts, games, tools, reports, full programs. Do NOT use it for short answers, explanations, or snippets under ~15 lines; those belong in the reply. Reuse the SAME id to revise an existing diagram (each write saves a new version), and always send the COMPLETE new content — content is never merged or patched. React diagrams must import from 'react' (React 19, plus react-dom/client) and export a default component; Tailwind CSS utility classes are available in html and react diagrams. Do not reference local files, imports, or assets that do not exist — a diagram must run standalone.",
+      "Create or revise a self-contained document that the user views and interacts with in a dedicated panel: an interactive React component, a standalone HTML page, an SVG graphic, a long markdown document, or a code file. Use this for anything substantial the user will read, run, reuse, or iterate on — apps, visualizations, charts, games, tools, reports, full programs. Runnable diagrams support immersive mode, focused keyboard input, and pointer lock. Prefer semantic controls; mark custom keyboard targets with data-keyboard-control and opt pointer-lock targets in with data-pointer-lock. window.RauArtifact provides focus and pointer-lock helpers. Do NOT use it for short answers, explanations, or snippets under ~15 lines; those belong in the reply. Reuse the SAME id to revise an existing diagram (each write saves a new version), and always send the COMPLETE new content — content is never merged or patched. React diagrams must import from 'react' (React 19, plus react-dom/client) and export a default component; Tailwind CSS utility classes are available in html and react diagrams. Do not reference local files, imports, or assets that do not exist — a diagram must run standalone.",
     input_schema: {
       type: "object",
       properties: {
@@ -527,8 +569,33 @@ export async function executeTool(
       const name = String(input.name ?? "");
       const description = String(input.description ?? "");
       const instructions = String(input.instructions ?? "");
-      const skill = await skillMake(userId, name, description, instructions);
-      return { result: skill };
+      const validToolNames = new Set<ToolName>([
+        "web_search",
+        "research",
+        "pdf_create",
+        "file_read",
+        "file_write",
+        "skill_make",
+        "diagram",
+        "memory_add",
+      ]);
+      const capabilityTools = Array.isArray(input.tools)
+        ? input.tools.filter(
+            (tool): tool is ToolName =>
+              typeof tool === "string" && validToolNames.has(tool as ToolName)
+          )
+        : [];
+      const capabilitySkills = Array.isArray(input.skills)
+        ? input.skills
+            .filter((skill): skill is string => typeof skill === "string")
+            .map((skill) => skill.trim())
+            .filter(Boolean)
+        : [];
+      const draft = await skillMake(name, description, instructions, {
+        tools: capabilityTools,
+        skills: capabilitySkills,
+      });
+      return { result: draft, detail: "Draft ready for review" };
     }
     case "diagram": {
       const diagram = await diagramWrite(userId, {

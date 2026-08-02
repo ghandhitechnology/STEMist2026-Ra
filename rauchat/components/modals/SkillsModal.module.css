@@ -10,6 +10,16 @@
   color: var(--rau-text-quaternary);
 }
 
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-3);
+}
+
+.fileInput {
+  display: none;
+}
+
 .button {
   height: 32px;
   padding: 0 12px;
@@ -87,10 +97,26 @@
   outline: none;
 }
 
+.button:disabled {
+  color: var(--rau-text-disabled);
+  cursor: not-allowed;
+}
+
 .explainer {
   font-size: var(--rau-fs-mini);
   color: var(--rau-text-tertiary);
   margin: 0 0 var(--rau-space-5);
+}
+
+.importStatus {
+  margin: calc(-1 * var(--rau-space-2)) 0 var(--rau-space-5);
+  padding: var(--rau-space-3) var(--rau-space-4);
+  border: 1px solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-bg-inset);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-secondary);
 }
 
 .list {
@@ -182,6 +208,10 @@
   white-space: nowrap;
 }
 
+.capabilitySummary {
+  color: var(--rau-text-quaternary);
+}
+
 .rowActions {
   display: flex;
   align-items: center;
@@ -189,7 +219,8 @@
   flex-shrink: 0;
 }
 
-.deleteIcon {
+.deleteIcon,
+.editIcon {
   width: 24px;
   height: 24px;
   border-radius: var(--rau-radius-sm);
@@ -207,7 +238,9 @@
 }
 
 .row:hover .deleteIcon,
-.row:focus-within .deleteIcon {
+.row:hover .editIcon,
+.row:focus-within .deleteIcon,
+.row:focus-within .editIcon {
   opacity: 1;
 }
 
@@ -216,7 +249,13 @@
   color: var(--rau-danger-hover);
 }
 
-.deleteIcon:focus-visible {
+.editIcon:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+
+.deleteIcon:focus-visible,
+.editIcon:focus-visible {
   opacity: 1;
   box-shadow: var(--rau-focus-ring);
   outline: none;
@@ -313,10 +352,67 @@
   gap: var(--rau-space-5);
 }
 
+.formHeading {
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  font-weight: var(--rau-fw-medium);
+  color: var(--rau-text-primary);
+}
+
 .field {
   display: flex;
   flex-direction: column;
   gap: var(--rau-space-2);
+}
+
+.fieldHint {
+  display: block;
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-quaternary);
+}
+
+.capabilityFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.capabilityFieldset > .fieldHint {
+  margin-top: var(--rau-space-2);
+}
+
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rau-space-2) var(--rau-space-4);
+  margin-top: var(--rau-space-3);
+}
+
+.capabilityOption {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-3);
+  min-height: 28px;
+  padding: 0 var(--rau-space-3);
+  border-radius: var(--rau-radius-sm);
+  color: var(--rau-text-secondary);
+  font-size: var(--rau-fs-mini);
+  cursor: pointer;
+}
+
+.capabilityOption:hover {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+
+.capabilityOption input {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--rau-accent);
 }
 
 .label {

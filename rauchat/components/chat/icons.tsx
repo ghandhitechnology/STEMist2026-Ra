@@ -207,6 +207,13 @@ export const IconExternal = (p: IconProps) => (
   </Svg>
 );
 
+export const IconFullscreen = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 2.75H3.75a1 1 0 0 0-1 1V6M10 2.75h2.25a1 1 0 0 1 1 1V6" />
+    <path d="M6 13.25H3.75a1 1 0 0 1-1-1V10M10 13.25h2.25a1 1 0 0 0 1-1V10" />
+  </Svg>
+);
+
 export const IconX = (p: IconProps) => (
   <Svg {...p}>
     <path d="m4 4 8 8M12 4l-8 8" />
