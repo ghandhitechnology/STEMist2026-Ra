@@ -57,6 +57,7 @@ export type ToolName =
   | "file_write"
   | "skill_make"
   | "diagram"
+  | "svg_render"
   | "memory_add"
   | "browser_use";
 

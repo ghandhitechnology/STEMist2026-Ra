@@ -10,6 +10,7 @@ import { writeFile } from "node:fs/promises";
 import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import type { SkillDraft, ToolName } from "@/lib/types";
+import { prepareSvgForChat } from "@/lib/svg";
 import { browserUse } from "./browserbase";
 import { writeDiagram } from "./diagrams";
 import { appendMemory } from "./memory";
@@ -409,6 +410,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
               "file_write",
               "skill_make",
               "diagram",
+              "svg_render",
               "memory_add",
               "browser_use",
             ],
@@ -458,6 +460,26 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["id", "title", "kind", "content"],
+    },
+  },
+  {
+    name: "svg_render",
+    description:
+      "Render a transparent line-drawing SVG inline in the chat. Prefer technical diagrams, icons, and geometric compositions over freehand figurative art. Build layered: skeletal/structural lines first, details second. Style: stroke-only on a transparent background (fill='none', stroke='currentColor', no background rects or solid fills). Complete standalone <svg> with a viewBox; no scripts or external references. For large interactive graphics or documents the user will iterate on, use the diagram tool instead. Only call this when a visual genuinely improves the answer.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Short caption shown under the rendered SVG",
+        },
+        svg: {
+          type: "string",
+          description:
+            "Complete standalone <svg> with a viewBox. Transparent line drawing: fill='none', stroke='currentColor' (or omit — host supplies it). Structural lines before detail; geometric forms over freehand figurative shapes. No background rect, no markdown fences, no scripts, no external resources.",
+        },
+      },
+      required: ["svg"],
     },
   },
   {
@@ -536,6 +558,8 @@ export function toolEventTitle(
       return String(input.name ?? "new skill");
     case "diagram":
       return String(input.title ?? input.id ?? "diagram");
+    case "svg_render":
+      return String(input.title ?? "SVG diagram");
     case "memory_add":
       return `"${truncate(String(input.content ?? ""), 72)}"`;
     case "browser_use":
@@ -602,6 +626,7 @@ export async function executeTool(
         "file_write",
         "skill_make",
         "diagram",
+        "svg_render",
         "memory_add",
         "browser_use",
       ]);
@@ -644,6 +669,18 @@ export async function executeTool(
           diagram.version === 1
             ? `${diagram.kind} · created`
             : `${diagram.kind} · v${diagram.version}`,
+      };
+    }
+    case "svg_render": {
+      const title = String(input.title ?? "SVG diagram");
+      const svg = prepareSvgForChat(String(input.svg ?? ""));
+      return {
+        // Don't echo the (sanitized) markup back into the model's own
+        // context — it already knows what it just wrote.
+        result: { ok: true, title, svgLength: svg.length },
+        // The UI needs the sanitized body to render it inline.
+        clientResult: { title, svg },
+        detail: "rendered inline",
       };
     }
     case "memory_add": {

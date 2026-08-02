@@ -93,6 +93,15 @@ export const IconDiagram = (p: IconProps) => (
   </Svg>
 );
 
+/** Node-and-curve motif — svg_render tool card (inline vector output). */
+export const IconSvg = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 11.5c1.5-6.5 4.5-8.5 6-4.5s3 5.5 4.5 1" />
+    <circle cx="3" cy="11.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="13.5" cy="8" r="1.1" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
 /** Bookmark outline — memory_add tool card (distinct from IconFileWrite). */
 export const IconMemory = (p: IconProps) => (
   <Svg {...p}>

@@ -59,6 +59,8 @@ export type SendInput = {
   tools?: readonly ToolName[];
   skillId?: string | null;
   forceTools?: boolean;
+  /** Auto-tools mode was on for this send — the server gates extra tools itself. */
+  autoTools?: boolean;
   /** Rauchat model id (lib/models.ts ModelInfo["id"]); omit for server default. */
   model?: string;
   /** Thinking level (lib/models.ts ThinkingLevel); omit for the model's default. */
@@ -279,6 +281,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
             tools: input.tools ?? [],
             skillId: input.skillId ?? null,
             forceTools: input.forceTools ?? false,
+            autoTools: input.autoTools ?? false,
             ...(input.model !== undefined ? { model: input.model } : {}),
             ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
             ...(input.attachments && input.attachments.length

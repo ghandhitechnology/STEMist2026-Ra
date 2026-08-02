@@ -29,6 +29,7 @@ import type OpenAI from "openai";
 import { z } from "zod";
 import type { MessageAttachment, Skill, ToolEvent, ToolName } from "@/lib/types";
 import { clampThinking, getModel } from "@/lib/models";
+import { detectVisualIntent, SVG_DRAWING_RULES } from "@/lib/svg";
 import { createSSEResponse } from "@/lib/server/sse";
 import { getOpenRouter, reasoningParam } from "@/lib/server/openrouter";
 import { OPENAI_TOOLS, executeTool, toolEventTitle } from "@/lib/server/tools";
@@ -81,6 +82,7 @@ const ToolNameSchema = z.enum([
   "file_write",
   "skill_make",
   "diagram",
+  "svg_render",
   "memory_add",
   "browser_use",
 ]);
@@ -98,6 +100,8 @@ const ChatRequestSchema = z.object({
   tools: z.array(ToolNameSchema).optional().default([]),
   skillId: z.string().nullable().optional().default(null),
   forceTools: z.boolean().optional().default(false),
+  /** Lets the model reach for svg_render on its own judgment, without an explicit ask. */
+  autoTools: z.boolean().optional().default(false),
   model: z.string().optional(),
   thinking: z.string().optional(),
   /** Workspace uploads for the current turn (enrich the latest user message). */
@@ -219,6 +223,7 @@ export async function POST(req: NextRequest) {
     tools: requestedTools,
     skillId,
     forceTools,
+    autoTools,
     attachments,
   } = parsed.data;
   const model = getModel(parsed.data.model);
@@ -255,6 +260,17 @@ export async function POST(req: NextRequest) {
     }
     const research = effectiveToolNames.has("research");
     const webSearch = effectiveToolNames.has("web_search") || research;
+    // svg_render is gated on: an explicit ask (toggle, or a skill capability
+    // that added it — either way effectiveToolNames already has it), the
+    // latest user turns expressing visual intent, or the autoTools flag.
+    const svgExplicit = effectiveToolNames.has("svg_render");
+    // Only recent turns count: a stray visual word early in a long
+    // conversation shouldn't latch the tool (and its encouraging prompt) on
+    // for every turn that follows.
+    const svgIntent = messages
+      .filter((m) => m.role === "user")
+      .slice(-3)
+      .some((m) => detectVisualIntent(m.content));
 
     let system = BASE_SYSTEM_PROMPT + buildSkillSection(activeSkills);
     if (research) {
@@ -281,6 +297,17 @@ export async function POST(req: NextRequest) {
       if (tool !== "research") activeToolNames.add(tool);
     }
     if (webSearch) activeToolNames.add("web_search");
+    if (svgExplicit || svgIntent || autoTools) {
+      activeToolNames.add("svg_render");
+      system +=
+        (svgExplicit || svgIntent
+          ? "\n\nThe svg_render tool is enabled for this conversation: the user wants visuals. When a small diagram, chart, or sketch would clarify your answer, call svg_render — it renders inline in the chat. Reference the rendered visual naturally."
+          : "\n\nThe svg_render tool is available but restricted: call it ONLY when a visual is absolutely necessary to answer correctly — when words alone cannot convey the spatial or structural relationship. Otherwise answer in text.") +
+        "\n\n" +
+        SVG_DRAWING_RULES;
+    } else {
+      activeToolNames.delete("svg_render");
+    }
     const tools = OPENAI_TOOLS.filter((t) =>
       activeToolNames.has(t.function.name as ToolName)
     );

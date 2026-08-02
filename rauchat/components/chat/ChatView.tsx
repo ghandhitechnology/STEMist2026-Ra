@@ -146,12 +146,6 @@ export const ChatView = memo(function ChatView({
     [showStreamingTurn, content, toolEvents]
   );
 
-  const runningTools = useMemo<ToolName[]>(
-    () =>
-      toolEvents.filter((e) => e.status === "running").map((e) => e.tool),
-    [toolEvents]
-  );
-
   const handleSuggestion = useCallback((text: string) => {
     composerRef.current?.setDraft(text);
   }, []);
@@ -263,7 +257,6 @@ export const ChatView = memo(function ChatView({
           onSend={onSendMessage}
           onStop={onStop}
           isStreaming={isStreaming}
-          runningTools={runningTools}
           unavailableTools={unavailableTools}
           defaultTools={defaultTools}
           autoTools={autoTools}

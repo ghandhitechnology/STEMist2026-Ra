@@ -505,6 +505,7 @@ export default function Home() {
         tools: Array.from(tools),
         skillId: submission.skillId,
         forceTools: submission.forceTools,
+        autoTools: submission.autoTools,
         model: model.id,
         thinking: clampThinking(
           model,

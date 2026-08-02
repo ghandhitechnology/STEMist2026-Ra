@@ -1458,6 +1458,42 @@
   color: var(--rau-success);
 }
 
+/* svg_render — transparent line drawings; ink follows --rau-text-primary. */
+.svgFigure {
+  margin: 0;
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-lg);
+  overflow: hidden;
+  background: transparent;
+}
+.svgCanvas {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  background: transparent;
+  color: var(--rau-text-primary);
+  overflow: auto;
+  min-height: 80px;
+}
+.svgCanvas > svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 420px;
+  background: transparent;
+}
+.svgCaption {
+  margin: 0;
+  padding: var(--rau-space-3) var(--rau-space-4);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-tertiary);
+  text-align: center;
+  border-top: var(--rau-hairline) solid var(--rau-border-faint);
+}
+
 /* §7 grouping */
 .groupChildren {
   margin-left: var(--rau-space-5);
@@ -1680,26 +1716,6 @@
   color: var(--rau-text-disabled);
   cursor: not-allowed;
   background: transparent;
-}
-/* §4.6 running — a 1px accent underline sweeping 0 → 100% */
-.chipRunning::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: var(--rau-accent);
-  transform-origin: left center;
-  animation: chipSweep 1200ms var(--rau-ease-linear) infinite;
-}
-@keyframes chipSweep {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
 }
 .chipIcon {
   display: flex;
@@ -1971,10 +1987,6 @@
   }
   .fadeWord {
     animation: none;
-  }
-  .chipRunning::after {
-    animation: none;
-    transform: scaleX(1);
   }
   .shimmerRow {
     animation: none;

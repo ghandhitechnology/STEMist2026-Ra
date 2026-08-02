@@ -34,6 +34,7 @@ const ToolNameSchema = z.enum([
   "file_write",
   "skill_make",
   "diagram",
+  "svg_render",
   "memory_add",
   "browser_use",
 ]);

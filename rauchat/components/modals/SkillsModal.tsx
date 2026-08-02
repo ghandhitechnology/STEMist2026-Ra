@@ -36,6 +36,7 @@ const CAPABILITY_TOOLS: Array<{ id: ToolName; label: string }> = [
   { id: "file_write", label: "Write files" },
   { id: "skill_make", label: "Draft skills" },
   { id: "diagram", label: "Create diagrams" },
+  { id: "svg_render", label: "Render SVGs inline" },
   { id: "memory_add", label: "Save memory" },
   { id: "browser_use", label: "Browser use" },
 ];

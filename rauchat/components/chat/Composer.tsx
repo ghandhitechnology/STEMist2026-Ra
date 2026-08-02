@@ -32,6 +32,7 @@ import {
   IconRegenerate,
   IconResearch,
   IconSkill,
+  IconSvg,
   IconWebSearch,
   IconX,
   type IconProps,
@@ -57,6 +58,7 @@ const TOOL_CHIPS: Array<{
   { tool: "file_read", label: "Read file", Icon: IconFileRead },
   { tool: "file_write", label: "Write file", Icon: IconFileWrite },
   { tool: "skill_make", label: "Skill maker", Icon: IconSkill },
+  { tool: "svg_render", label: "SVG", Icon: IconSvg },
   { tool: "browser_use", label: "Browser", Icon: IconBrowser },
 ];
 
@@ -69,6 +71,8 @@ export type ComposerSubmission = {
   files: File[];
   /** True when sent with Cmd/Ctrl+Enter — the tool set is forced on (§4.5). */
   forceTools: boolean;
+  /** Auto-tools mode was on for this send — the server gates extra tools itself. */
+  autoTools: boolean;
 };
 
 export type ComposerHandle = {
@@ -84,8 +88,6 @@ export type ComposerProps = {
   onStop?: () => void;
   isStreaming?: boolean;
   disabled?: boolean;
-  /** Tools executing this turn — drives the running underline (§4.6). */
-  runningTools?: readonly ToolName[];
   /** Tools that cannot be used, mapped to the reason shown on hover. */
   unavailableTools?: Partial<Record<ToolName, string>>;
   defaultTools?: readonly ToolName[];
@@ -112,7 +114,6 @@ export const Composer = memo(
       onStop,
       isStreaming = false,
       disabled = false,
-      runningTools,
       unavailableTools,
       defaultTools,
       autoTools = false,
@@ -297,11 +298,21 @@ export const Composer = memo(
           // "/token rest of message" turns a tool on or invokes a skill.
           let skillId = activeSkillId;
           const sendTools = new Set(tools);
+          // Auto mode was on for this send — set below whenever the prop was
+          // already on, or "/auto message" just turned it on for this turn.
+          let sendAutoTools = autoTools;
           // Auto mode: the agent gets every usable tool; research stays a
-          // manual mode (it rewrites the system prompt, not just the tool set).
+          // manual mode (it rewrites the system prompt, not just the tool
+          // set), and svg_render is offered via the autoTools flag itself
+          // (the server derives auto availability from it) rather than the
+          // tool set.
           if (autoTools) {
             for (const t of TOOL_CHIPS) {
-              if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
+              if (
+                t.tool !== "research" &&
+                t.tool !== "svg_render" &&
+                !unavailableTools?.[t.tool]
+              ) {
                 sendTools.add(t.tool);
               }
             }
@@ -316,8 +327,13 @@ export const Composer = memo(
             }
             // "/auto message" turns the mode on and applies it to this send.
             if (!autoTools) onToggleAutoTools?.();
+            sendAutoTools = true;
             for (const t of TOOL_CHIPS) {
-              if (t.tool !== "research" && !unavailableTools?.[t.tool]) {
+              if (
+                t.tool !== "research" &&
+                t.tool !== "svg_render" &&
+                !unavailableTools?.[t.tool]
+              ) {
                 sendTools.add(t.tool);
               }
             }
@@ -364,6 +380,7 @@ export const Composer = memo(
               skillId,
               files: outgoing,
               forceTools,
+              autoTools: sendAutoTools,
             });
             setDraftState("");
             setFiles([]);
@@ -557,11 +574,7 @@ export const Composer = memo(
                       ({ tool, label, Icon }) => (
                         <span
                           key={tool}
-                          className={`${styles.attachChip} ${
-                            runningTools?.includes(tool)
-                              ? styles.chipRunning
-                              : ""
-                          }`}
+                          className={styles.attachChip}
                         >
                           <span className={styles.chipIcon}>
                             <Icon size={12} />
