@@ -1,0 +1,79 @@
+/* App shell grid (§3.1).
+   Side tracks use discrete class combinations with literal lengths — never
+   transition `grid-template-columns` (browsers mis-allocate free space into
+   the telemetry column while the sidebar width changes). */
+
+.shell {
+  display: grid;
+  grid-template-columns:
+    var(--rau-sidebar-w)
+    minmax(0, 1fr)
+    var(--rau-telemetry-w);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Grid items default to min-width:auto (content-sized). That lets the
+   telemetry axis labels expand the right track past 320px when the sidebar
+   column changes. Force both side columns to respect the track. */
+.shell > * {
+  min-width: 0;
+}
+
+/* ---- 3-column (no diagram) ---- */
+
+.sidebarCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    var(--rau-telemetry-w);
+}
+
+.telemetryCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w)
+    minmax(0, 1fr)
+    var(--rau-telemetry-w-rail);
+}
+
+.sidebarCollapsed.telemetryCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    var(--rau-telemetry-w-rail);
+}
+
+/* ---- 4-column (diagram open) ---- */
+
+.withDiagram {
+  grid-template-columns:
+    var(--rau-sidebar-w)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-telemetry-w);
+}
+
+.withDiagram.sidebarCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-telemetry-w);
+}
+
+.withDiagram.telemetryCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-telemetry-w-rail);
+}
+
+.withDiagram.sidebarCollapsed.telemetryCollapsed {
+  grid-template-columns:
+    var(--rau-sidebar-w-collapsed)
+    minmax(0, 1fr)
+    minmax(0, clamp(380px, 42%, 760px))
+    var(--rau-telemetry-w-rail);
+}

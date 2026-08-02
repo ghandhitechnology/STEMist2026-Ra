@@ -1,31 +1,37 @@
 .sidebar {
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   background: var(--rau-bg-l1);
   border-right: 1px solid var(--rau-border-subtle);
   display: flex;
   flex-direction: column;
-  width: var(--rau-sidebar-w);
-  transition: width var(--rau-dur-slow) var(--rau-ease-inout);
+  /* Fill the shell track. Width animation lives on the grid track classes
+     in shell.module.css — keeping a second pixel width here reflow-fights
+     the telemetry column. */
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* The rail is the same surface, just narrower — it must keep the bg-l1 fill,
    the right border and the column layout (§3.3). */
 .sidebarCollapsed {
   composes: sidebar;
-  width: var(--rau-sidebar-w-collapsed);
 }
 
 /* ---- Header ---- */
 
 .header {
   height: var(--rau-topbar-h);
-  padding: 0 12px 0 16px;
+  padding: 0 12px 0 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--rau-border-faint);
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .sidebarCollapsed .header {
@@ -36,7 +42,7 @@
 .wordmark {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-family: var(--rau-font-sans);
   font-weight: 590;
   font-size: 15px;
@@ -46,8 +52,13 @@
   cursor: default;
 }
 
-.wordmarkRau {
-  color: var(--rau-text-primary);
+.wordmarkMark {
+  display: block;
+  height: 34px;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  user-select: none;
 }
 
 .wordmarkChat {
@@ -57,25 +68,6 @@
 
 .header:hover .wordmarkChat {
   color: var(--rau-text-secondary);
-}
-
-.notch {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--rau-border-default);
-  border-radius: 2px;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.notch::after {
-  content: "";
-  position: absolute;
-  left: 2px;
-  bottom: 2px;
-  width: 4px;
-  height: 4px;
-  background: var(--rau-accent);
 }
 
 .iconButton {
@@ -291,18 +283,6 @@
 
 .sidebarCollapsed .railIcons {
   display: flex;
-}
-
-/* ---- Peek overlay when hovering a collapsed rail ---- */
-
-.peekOverlay {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: var(--rau-sidebar-w);
-  z-index: var(--rau-z-popover);
-  box-shadow: var(--rau-elev-popover);
 }
 
 /* ---- Workspace section ---- */

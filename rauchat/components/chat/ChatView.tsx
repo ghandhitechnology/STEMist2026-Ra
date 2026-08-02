@@ -34,7 +34,7 @@ export type ChatViewProps = {
   conversation: Conversation | null;
   /** The in-flight turn, straight from useChatStream().state. */
   streamingState: StreamingState;
-  onSendMessage: (submission: ComposerSubmission) => void;
+  onSendMessage: (submission: ComposerSubmission) => void | Promise<void>;
   onStop?: () => void;
   /** Retry after a failed generation (§8). */
   onRetry?: () => void;
@@ -74,6 +74,7 @@ export type ChatViewProps = {
   onSelectSkill?: (id: string | null) => void;
   onAttach?: (files: File[]) => void;
   composerError?: string | null;
+  onDismissComposerError?: () => void;
   notice?: { tone: "neutral" | "warning"; message: string } | null;
   suggestions?: string[];
 } & MessageActions;
@@ -107,6 +108,7 @@ export const ChatView = memo(function ChatView({
   onSelectSkill,
   onAttach,
   composerError = null,
+  onDismissComposerError,
   notice = null,
   suggestions,
   ...messageActions
@@ -117,7 +119,15 @@ export const ChatView = memo(function ChatView({
   const wasStreaming = useRef(false);
 
   const messages = conversation?.messages ?? [];
-  const { isStreaming, content, toolEvents, error } = streamingState;
+  // `thinking` (the prop) is the reasoning-effort level; `streamThinking` is
+  // the live reasoning trace for the in-flight turn.
+  const {
+    isStreaming,
+    content,
+    toolEvents,
+    error,
+    thinking: streamThinking,
+  } = streamingState;
 
   // Stamp the in-flight turn once, when it starts.
   if (isStreaming && !wasStreaming.current) turnStartedAt.current = Date.now();
@@ -138,16 +148,11 @@ export const ChatView = memo(function ChatView({
             role: "assistant",
             content,
             createdAt: turnStartedAt.current,
+            thinking: streamThinking || undefined,
             toolEvents,
           }
         : null,
-    [showStreamingTurn, content, toolEvents]
-  );
-
-  const runningTools = useMemo<ToolName[]>(
-    () =>
-      toolEvents.filter((e) => e.status === "running").map((e) => e.tool),
-    [toolEvents]
+    [showStreamingTurn, content, streamThinking, toolEvents]
   );
 
   const handleSuggestion = useCallback((text: string) => {
@@ -261,7 +266,6 @@ export const ChatView = memo(function ChatView({
           onSend={onSendMessage}
           onStop={onStop}
           isStreaming={isStreaming}
-          runningTools={runningTools}
           unavailableTools={unavailableTools}
           defaultTools={defaultTools}
           autoTools={autoTools}
@@ -271,6 +275,7 @@ export const ChatView = memo(function ChatView({
           onSelectSkill={onSelectSkill}
           onAttach={onAttach}
           error={composerError}
+          onDismissError={onDismissComposerError}
           notice={notice}
         />
       </div>

@@ -6,8 +6,8 @@
  * The expandable model selector that sits beside the conversation title in the
  * chat top bar (DESIGN.md §3.4). Resting state is a quiet ghost trigger showing
  * the active model's shortLabel; clicking expands a §4.10 popover listing every
- * model in lib/models.ts grouped by family, plus a §4.13 segmented control for
- * the active model's thinking levels.
+ * model in lib/models.ts grouped by family, plus a continuous thinking slider
+ * that snaps to the active model's supported levels.
  *
  * Availability comes from GET /api/models (OpenRouter catalog, cached
  * server-side). If the call fails we fall back silently to the static catalog
@@ -22,8 +22,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   MODELS,
@@ -67,7 +67,39 @@ const THINKING_LABEL: Record<ThinkingLevel, string> = {
   medium: "Medium",
   high: "High",
   xhigh: "X-High",
+  max: "Max",
 };
+
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
+function ratioForLevel(levels: readonly ThinkingLevel[], level: ThinkingLevel): number {
+  if (levels.length <= 1) return 0;
+  const idx = Math.max(0, levels.indexOf(level));
+  return idx / (levels.length - 1);
+}
+
+function levelForRatio(
+  levels: readonly ThinkingLevel[],
+  ratio: number
+): ThinkingLevel {
+  if (levels.length === 0) return "off";
+  if (levels.length === 1) return levels[0];
+  const idx = Math.round(clamp01(ratio) * (levels.length - 1));
+  return levels[idx] ?? levels[0];
+}
+
+/** Solid fill color: accent yellow at 0 → danger red at 1. */
+function heatColor(ratio: number): string {
+  const t = clamp01(ratio);
+  const from = [232, 163, 61]; // --rau-accent
+  const to = [220, 74, 80]; // --rau-danger
+  const r = Math.round(from[0] + (to[0] - from[0]) * t);
+  const g = Math.round(from[1] + (to[1] - from[1]) * t);
+  const b = Math.round(from[2] + (to[2] - from[2]) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 export function ModelSelector({
   modelId,
@@ -78,10 +110,23 @@ export function ModelSelector({
   const [open, setOpen] = useState(false);
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
   const [highlight, setHighlight] = useState(0);
+  /**
+   * idle — follow committed level (spring on change)
+   * dragging — finger/pointer owns a continuous ratio, no transition
+   * settling — spring from release point to the nearest notch
+   */
+  const [sliderPhase, setSliderPhase] = useState<"idle" | "dragging" | "settling">(
+    "idle"
+  );
+  const [visualRatio, setVisualRatio] = useState<number | null>(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phaseRef = useRef<"idle" | "dragging" | "settling">("idle");
+  phaseRef.current = sliderPhase;
 
   const baseId = useId();
   const listId = `${baseId}-list`;
@@ -89,6 +134,10 @@ export function ModelSelector({
 
   const model = getModel(modelId);
   const level = clampThinking(model, thinking);
+  const levels = model.thinkingLevels;
+  const committedRatio = ratioForLevel(levels, level);
+  const ratio = visualRatio ?? committedRatio;
+  const springy = sliderPhase !== "dragging";
 
   /* ---- availability, fetched once ---- */
   useEffect(() => {
@@ -196,6 +245,90 @@ export function ModelSelector({
     [model.id, onChange]
   );
 
+  const clearSettleTimer = useCallback(() => {
+    if (settleTimerRef.current !== null) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+  }, []);
+
+  // Drop in-flight drag when the model (and its level set) changes under us.
+  useEffect(() => {
+    clearSettleTimer();
+    setVisualRatio(null);
+    setSliderPhase("idle");
+  }, [model.id, levels, clearSettleTimer]);
+
+  useEffect(() => () => clearSettleTimer(), [clearSettleTimer]);
+
+  const ratioFromClientX = useCallback((clientX: number) => {
+    const track = trackRef.current;
+    if (!track) return 0;
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+    return clamp01((clientX - rect.left) / rect.width);
+  }, []);
+
+  const endDrag = useCallback(
+    (clientX: number) => {
+      if (phaseRef.current !== "dragging") return;
+      const release = ratioFromClientX(clientX);
+      const next = levelForRatio(levels, release);
+      const snap = ratioForLevel(levels, next);
+      // 1) flip to settling while still at the release point (spring armed)
+      // 2) next frame aim at the notch so width/left actually transition
+      setVisualRatio(release);
+      setSliderPhase("settling");
+      selectThinking(next);
+      clearSettleTimer();
+      // Double rAF: let the spring class paint at the release point before
+      // aiming at the notch, otherwise some engines skip the transition.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setVisualRatio(snap);
+        });
+      });
+      settleTimerRef.current = setTimeout(() => {
+        settleTimerRef.current = null;
+        setVisualRatio(null);
+        setSliderPhase("idle");
+      }, 720);
+    },
+    [clearSettleTimer, levels, ratioFromClientX, selectThinking]
+  );
+
+  const onSliderPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      clearSettleTimer();
+      setSliderPhase("dragging");
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setVisualRatio(ratioFromClientX(e.clientX));
+    },
+    [clearSettleTimer, ratioFromClientX]
+  );
+
+  const onSliderPointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (phaseRef.current !== "dragging") return;
+      setVisualRatio(ratioFromClientX(e.clientX));
+    },
+    [ratioFromClientX]
+  );
+
+  const onSliderPointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      endDrag(e.clientX);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* already released */
+      }
+    },
+    [endDrag]
+  );
+
   /* ---- roving highlight ---- */
   const step = useCallback(
     (from: number, delta: number) => {
@@ -233,26 +366,31 @@ export function ModelSelector({
     [highlight, ordered, selectModel, step]
   );
 
-  const onSegKeyDown = useCallback(
+  const onSliderKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
-      const levels = model.thinkingLevels;
       const idx = levels.indexOf(level);
-      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      if (e.key === "ArrowRight" || e.key === "ArrowUp") {
         e.preventDefault();
-        const delta = e.key === "ArrowRight" ? 1 : -1;
-        const next = levels[(idx + delta + levels.length) % levels.length];
+        const next = levels[Math.min(levels.length - 1, idx + 1)];
         if (next) selectThinking(next);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = levels[Math.max(0, idx - 1)];
+        if (next) selectThinking(next);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        if (levels[0]) selectThinking(levels[0]);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        const last = levels[levels.length - 1];
+        if (last) selectThinking(last);
       }
     },
-    [level, model.thinkingLevels, selectThinking]
+    [level, levels, selectThinking]
   );
 
-  const segCount = model.thinkingLevels.length;
-  const segIndex = Math.max(0, model.thinkingLevels.indexOf(level));
-  const indicatorStyle: CSSProperties = {
-    width: `calc((100% - 4px) / ${segCount})`,
-    transform: `translateX(${segIndex * 100}%)`,
-  };
+  const fillPct = `${(ratio * 100).toFixed(3)}%`;
+  const fillColor = heatColor(ratio);
 
   return (
     <div className={styles.wrap} ref={wrapRef}>
@@ -343,31 +481,57 @@ export function ModelSelector({
               <span className={styles.thinkingLabel} id={`${baseId}-thinking`}>
                 Thinking
               </span>
-              <span className={styles.thinkingModel}>{model.shortLabel}</span>
+              <span
+                className={`${styles.thinkingValue} ${
+                  springy ? "" : styles.thinkingValueLive
+                }`}
+                style={{ color: fillColor }}
+                aria-live="polite"
+              >
+                {THINKING_LABEL[levelForRatio(levels, ratio)]}
+              </span>
             </div>
             <div
-              className={styles.segTrack}
-              role="radiogroup"
+              ref={trackRef}
+              className={`${styles.slider} ${springy ? styles.sliderSpring : ""}`}
+              role="slider"
+              tabIndex={0}
               aria-labelledby={`${baseId}-thinking`}
-              onKeyDown={onSegKeyDown}
+              aria-valuemin={0}
+              aria-valuemax={levels.length - 1}
+              aria-valuenow={Math.max(0, levels.indexOf(level))}
+              aria-valuetext={THINKING_LABEL[level]}
+              onKeyDown={onSliderKeyDown}
+              onPointerDown={onSliderPointerDown}
+              onPointerMove={onSliderPointerMove}
+              onPointerUp={onSliderPointerUp}
+              onPointerCancel={onSliderPointerUp}
             >
-              <span className={styles.segIndicator} style={indicatorStyle} aria-hidden="true" />
-              {model.thinkingLevels.map((lv) => {
-                const on = lv === level;
-                return (
-                  <button
-                    key={lv}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    tabIndex={on ? 0 : -1}
-                    className={`${styles.seg} ${on ? styles.segOn : ""}`}
-                    onClick={() => selectThinking(lv)}
-                  >
-                    {THINKING_LABEL[lv]}
-                  </button>
-                );
-              })}
+              <div className={styles.sliderTrack} aria-hidden="true">
+                <div
+                  className={styles.sliderFill}
+                  style={{ width: fillPct, backgroundColor: fillColor }}
+                />
+                <div className={styles.sliderTicks}>
+                  {levels.map((lv, i) => {
+                    const left =
+                      levels.length <= 1
+                        ? "0%"
+                        : `${((i / (levels.length - 1)) * 100).toFixed(3)}%`;
+                    const reached = ratioForLevel(levels, lv) <= ratio + 0.001;
+                    return (
+                      <span
+                        key={lv}
+                        className={`${styles.sliderTick} ${
+                          reached ? styles.sliderTickOn : ""
+                        }`}
+                        style={{ left }}
+                      />
+                    );
+                  })}
+                </div>
+                <span className={styles.sliderThumb} style={{ left: fillPct }} />
+              </div>
             </div>
           </div>
         </div>

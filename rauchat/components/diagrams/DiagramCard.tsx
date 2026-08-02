@@ -29,7 +29,7 @@ export const DiagramCard = memo(function DiagramCard({
       type="button"
       className={`${styles.card} ${active ? styles.cardActive : ""}`}
       onClick={() => onOpen(diagram)}
-      aria-label={`Open diagram ${diagram.title}`}
+      aria-label={`Open artifact ${diagram.title}`}
     >
       <span className={styles.cardIcon}>
         <IconDiagram size={16} />

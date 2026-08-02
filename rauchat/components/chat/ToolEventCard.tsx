@@ -15,6 +15,7 @@ import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react"
 import type { ToolEvent, ToolName } from "@/lib/types";
 import styles from "./chat.module.css";
 import {
+  IconBrowser,
   IconDiagram,
   IconChevronDown,
   IconDownload,
@@ -25,9 +26,11 @@ import {
   IconPdf,
   IconResearch,
   IconSkill,
+  IconSvg,
   IconWebSearch,
   type IconProps,
 } from "./icons";
+import { prepareSvgForChat } from "@/lib/svg";
 // Imported by path, not through the components/diagrams barrel, so this does
 // not pull DiagramPanel (which imports this module's barrel) into a cycle.
 import { DiagramCard } from "../diagrams/DiagramCard";
@@ -141,11 +144,13 @@ const TOOL_META: Record<ToolName, ToolMeta> = {
   file_read: { label: "Read file", Icon: IconFileRead, monoArg: true },
   file_write: { label: "Write file", Icon: IconFileWrite, monoArg: true },
   skill_make: { label: "Skill maker", Icon: IconSkill, keepExpanded: true },
-  diagram: { label: "Diagram", Icon: IconDiagram, keepExpanded: true },
+  diagram: { label: "Artifact", Icon: IconDiagram, keepExpanded: true },
+  svg_render: { label: "Sketch", Icon: IconSvg, keepExpanded: true },
   // toolEventTitle returns the saved sentence (quoted) for memory_add, and
   // the card body below renders that same sentence via `detail` — hideArg
   // keeps it from printing twice in the collapsed header.
   memory_add: { label: "Memory", Icon: IconMemory, hideArg: true },
+  browser_use: { label: "Browser", Icon: IconBrowser, quoteArg: true, keepExpanded: true },
 };
 
 const TOOL_VERBS: Record<ToolName, string> = {
@@ -155,8 +160,10 @@ const TOOL_VERBS: Record<ToolName, string> = {
   file_read: "Reading file",
   file_write: "Writing file",
   skill_make: "Authoring skill",
-  diagram: "Building diagram",
+  diagram: "Building artifact",
+  svg_render: "Sketching",
   memory_add: "Saving to memory",
+  browser_use: "Using the browser",
 };
 
 /** Present-tense verb for the thinking indicator (§4.8). */
@@ -547,6 +554,41 @@ function SkillBody({ event, onInstallSkill }: BodyProps) {
   );
 }
 
+function SvgRenderBody({ event }: { event: ToolEvent }) {
+  if (event.status === "running") return <Shimmer rows={3} />;
+
+  const rec = asRec(event.result);
+  const svg = pickStr(rec, "svg");
+  if (!svg) {
+    return <EmptyLine>{event.detail ?? "No SVG produced."}</EmptyLine>;
+  }
+
+  const title = pickStr(rec, "title") ?? event.title;
+
+  // Sanitized (+ line-drawing stylized) again client-side. Inlined — not an
+  // <img> data URL — so stroke="currentColor" tracks the chat theme on a
+  // transparent canvas. Scripts / handlers were already stripped.
+  let clean: string;
+  try {
+    clean = prepareSvgForChat(svg);
+  } catch {
+    return <EmptyLine>Could not render the SVG.</EmptyLine>;
+  }
+
+  return (
+    <figure className={styles.svgFigure}>
+      <div
+        className={styles.svgCanvas}
+        role="img"
+        aria-label={title || "Sketch"}
+        // Sanitized markup only — see prepareSvgForChat / sanitizeSvg.
+        dangerouslySetInnerHTML={{ __html: clean }}
+      />
+      {title ? <figcaption className={styles.svgCaption}>{title}</figcaption> : null}
+    </figure>
+  );
+}
+
 const BODIES: Record<ToolName, (p: BodyProps) => React.JSX.Element> = {
   web_search: WebSearchBody,
   research: ResearchBody,
@@ -557,11 +599,53 @@ const BODIES: Record<ToolName, (p: BodyProps) => React.JSX.Element> = {
   // Completed diagrams short-circuit to <DiagramCard/> before the card body
   // renders; this only covers the running state.
   diagram: () => <Shimmer rows={2} />,
+  svg_render: SvgRenderBody,
   // A memory save is a one-line fact; `detail` already carries it.
   memory_add: ({ event }) => (
     <EmptyLine>{event.detail ?? "Saved to memory."}</EmptyLine>
   ),
+  browser_use: BrowserUseBody,
 };
+
+function BrowserUseBody({ event }: BodyProps) {
+  if (event.status === "running") return <Shimmer rows={2} />;
+  const rec = asRec(event.result);
+  const status = asStr(rec?.status) ?? event.detail ?? "done";
+  const liveViewUrl = asStr(rec?.liveViewUrl);
+  const sessionId = asStr(rec?.sessionId);
+  const result = rec?.result;
+  const summary =
+    typeof result === "string"
+      ? result
+      : result
+        ? JSON.stringify(result, null, 2)
+        : null;
+
+  return (
+    <div>
+      <EmptyLine>
+        {status}
+        {sessionId ? ` · ${sessionId}` : ""}
+      </EmptyLine>
+      {liveViewUrl ? (
+        <a
+          className={styles.downloadLink}
+          href={liveViewUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open session
+          <IconExternal size={12} />
+        </a>
+      ) : null}
+      {summary ? (
+        <pre className={styles.fileLines}>
+          <code>{summary.slice(0, 4000)}</code>
+        </pre>
+      ) : null}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------
    Card
@@ -636,6 +720,11 @@ export const ToolEventCard = memo(function ToolEventCard({
         onOpen={onOpenDiagram}
       />
     );
+  }
+
+  // Inline SVGs are the same idea: show the figure, not a collapsible trace.
+  if (event.tool === "svg_render" && event.status === "done") {
+    return <SvgRenderBody event={event} />;
   }
 
   return (
@@ -772,8 +861,9 @@ export const ToolEventList = memo(function ToolEventList({
       j += 1;
     }
     const runLength = j - i;
-    // Diagrams are deliverables, not trace noise — never fold them away.
-    if (runLength >= 3 && tool !== "diagram") {
+    // Diagrams and inline SVGs are deliverables, not trace noise — never
+    // fold them away.
+    if (runLength >= 3 && tool !== "diagram" && tool !== "svg_render") {
       nodes.push(
         <ToolEventGroup key={events[i].id} events={events.slice(i, j)} {...rest} />
       );

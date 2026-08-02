@@ -67,6 +67,24 @@ export function CaretUpIcon({ size = 8, className }: IconProps) {
   );
 }
 
+/** Stacked rows — the diverging-bar reading of the trait axes. */
+export function RowsIcon({ size = 12, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M2.5 4h11M4.5 8h9M3.5 12h11" />
+    </svg>
+  );
+}
+
+/** Hexagon — the radar reading of the three trait axes. */
+export function PolygonIcon({ size = 12, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M8 2.25 13 5.1v5.8L8 13.75 3 10.9V5.1Z" />
+    </svg>
+  );
+}
+
 /** Delta caret — down. */
 export function CaretDownIcon({ size = 8, className }: IconProps) {
   return (

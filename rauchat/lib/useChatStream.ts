@@ -18,10 +18,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Message, ToolEvent, ToolName, TraitSnapshot } from "./types";
+import type {
+  Message,
+  MessageAttachment,
+  ToolEvent,
+  ToolName,
+  TraitSnapshot,
+} from "./types";
 
 export type StreamingMessage = {
   content: string;
+  /** Accumulated model reasoning ("thinking") deltas for the turn. */
+  thinking: string;
   toolEvents: ToolEvent[];
   traitSnapshot: TraitSnapshot | null;
 };
@@ -29,12 +37,11 @@ export type StreamingMessage = {
 export type StreamingState = StreamingMessage & {
   isStreaming: boolean;
   error: string | null;
-  /** Accumulated model reasoning ("thinking") deltas for the in-flight turn. */
-  thinking: string;
 };
 
 export const EMPTY_STREAMING_MESSAGE: StreamingMessage = {
   content: "",
+  thinking: "",
   toolEvents: [],
   traitSnapshot: null,
 };
@@ -43,7 +50,6 @@ export const EMPTY_STREAMING_STATE: StreamingState = {
   ...EMPTY_STREAMING_MESSAGE,
   isStreaming: false,
   error: null,
-  thinking: "",
 };
 
 export type SendInput = {
@@ -53,10 +59,17 @@ export type SendInput = {
   tools?: readonly ToolName[];
   skillId?: string | null;
   forceTools?: boolean;
+  /** Auto-tools mode was on for this send — the server gates extra tools itself. */
+  autoTools?: boolean;
   /** Rauchat model id (lib/models.ts ModelInfo["id"]); omit for server default. */
   model?: string;
   /** Thinking level (lib/models.ts ThinkingLevel); omit for the model's default. */
   thinking?: string;
+  /**
+   * Workspace uploads for the current turn only. The server uses these to
+   * enrich the latest user message (inline text / vision / path inventory).
+   */
+  attachments?: readonly MessageAttachment[];
   /** Merged into the request body verbatim. */
   extra?: Record<string, unknown>;
 };
@@ -172,7 +185,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(
     null
   );
-  const [streamingThinking, setStreamingThinking] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -182,7 +194,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
 
   const abortRef = useRef<AbortController | null>(null);
   const bufferRef = useRef<StreamingMessage>(EMPTY_STREAMING_MESSAGE);
-  const thinkingRef = useRef<string>("");
   const frameRef = useRef<number | null>(null);
 
   const cancelFlush = useCallback(() => {
@@ -194,7 +205,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
 
   const commit = useCallback(() => {
     setStreamingMessage({ ...bufferRef.current });
-    setStreamingThinking(thinkingRef.current);
   }, []);
 
   /** Coalesce high-frequency updates into one commit per frame. */
@@ -221,9 +231,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
   const reset = useCallback(() => {
     cancelFlush();
     bufferRef.current = EMPTY_STREAMING_MESSAGE;
-    thinkingRef.current = "";
     setStreamingMessage(null);
-    setStreamingThinking("");
     setError(null);
   }, [cancelFlush]);
 
@@ -242,10 +250,13 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
       abortRef.current = controller;
 
       cancelFlush();
-      bufferRef.current = { content: "", toolEvents: [], traitSnapshot: null };
-      thinkingRef.current = "";
+      bufferRef.current = {
+        content: "",
+        thinking: "",
+        toolEvents: [],
+        traitSnapshot: null,
+      };
       setStreamingMessage(bufferRef.current);
-      setStreamingThinking("");
       setError(null);
       setIsStreaming(true);
 
@@ -268,8 +279,12 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
             tools: input.tools ?? [],
             skillId: input.skillId ?? null,
             forceTools: input.forceTools ?? false,
+            autoTools: input.autoTools ?? false,
             ...(input.model !== undefined ? { model: input.model } : {}),
             ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
+            ...(input.attachments && input.attachments.length
+              ? { attachments: input.attachments }
+              : {}),
             ...input.extra,
           }),
         });
@@ -319,7 +334,10 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
             case "thinking": {
               const delta = parseTextDelta(frame.data);
               if (!delta) return;
-              thinkingRef.current += delta;
+              bufferRef.current = {
+                ...bufferRef.current,
+                thinking: bufferRef.current.thinking + delta,
+              };
               handlers.current.onThinking?.(delta);
               scheduleFlush();
               return;
@@ -390,7 +408,6 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
         cancelFlush();
         const final = { ...bufferRef.current };
         setStreamingMessage(final);
-        setStreamingThinking(thinkingRef.current);
         setIsStreaming(false);
 
         if (status.error) {
@@ -424,11 +441,11 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
 
   const state: StreamingState = {
     content: streamingMessage?.content ?? "",
+    thinking: streamingMessage?.thinking ?? "",
     toolEvents: streamingMessage?.toolEvents ?? EMPTY_STREAMING_MESSAGE.toolEvents,
     traitSnapshot: streamingMessage?.traitSnapshot ?? null,
     isStreaming,
     error,
-    thinking: streamingThinking,
   };
 
   return {
@@ -436,7 +453,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
     stop,
     isStreaming,
     streamingMessage,
-    streamingThinking,
+    streamingThinking: streamingMessage?.thinking ?? "",
     error,
     state,
     reset,

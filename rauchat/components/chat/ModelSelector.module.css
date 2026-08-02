@@ -2,8 +2,7 @@
  * components/chat/ModelSelector.module.css
  *
  * DESIGN.md §3.4 (top bar model string), §4.10 (popover/dropdown menu),
- * §4.13 (segmented control), §5 (motion budget).
- * No shadows other than --rau-elev-popover, no gradients, no glow.
+ * thinking slider (continuous drag, snap-to-level), §5 (motion budget).
  */
 
 .wrap {
@@ -210,7 +209,7 @@
 }
 
 /* ------------------------------------------------------------
-   Thinking row + segmented control (§4.13)
+   Thinking row + continuous snap slider
    ------------------------------------------------------------ */
 
 .thinking {
@@ -230,71 +229,158 @@
   text-transform: uppercase;
   color: var(--rau-text-tertiary);
 }
-.thinkingModel {
+.thinkingValue {
   font-size: var(--rau-fs-micro);
   line-height: var(--rau-lh-micro);
-  color: var(--rau-text-quaternary);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-accent);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 140px;
+  /* Soft color drift — no bounce on hue, only on the thumb/fill travel. */
+  transition: color 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.thinkingValueLive {
+  transition: none;
 }
 
-.segTrack {
+/* Tall hit target, thin visual track (reference pill, scaled down). */
+.slider {
   position: relative;
   display: flex;
+  align-items: center;
   height: 28px;
-  padding: 2px;
+  margin: 0 calc(-1 * var(--rau-space-1));
+  padding: 0 var(--rau-space-1);
+  outline: none;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.slider:focus-visible .sliderThumb {
+  box-shadow:
+    0 0 0 2px var(--rau-bg-l3),
+    0 0 0 4px rgba(232, 163, 61, 0.45);
+}
+
+.sliderTrack {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
   background: var(--rau-bg-inset);
   border: var(--rau-hairline) solid var(--rau-border-subtle);
-  border-radius: 4px;
+  overflow: visible;
 }
-.segIndicator {
+
+/* Solid heat color (yellow→red by level), not a multi-stop gradient bar. */
+.sliderFill {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-  border-radius: var(--rau-radius-xs);
-  background: var(--rau-bg-l3);
-  transition: transform var(--rau-dur-fast) var(--rau-ease-standard);
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background-color: var(--rau-accent);
+  pointer-events: none;
+  will-change: width, background-color;
+}
+
+.sliderTicks {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
 }
-.seg {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 0;
-  min-width: 0;
-  border: 0;
-  border-radius: var(--rau-radius-xs);
-  background: transparent;
-  color: var(--rau-text-tertiary);
-  font-family: inherit;
-  font-size: var(--rau-fs-mini);
-  line-height: var(--rau-lh-mini);
-  letter-spacing: var(--rau-ls-snug);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+.sliderTick {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  transform: translate(-50%, -50%);
 }
-.seg:hover:not(:disabled) {
-  color: var(--rau-text-secondary);
+.sliderTickOn {
+  background: rgba(20, 13, 2, 0.35);
 }
-.seg:focus-visible {
-  outline: none;
-  box-shadow: var(--rau-focus-ring);
+
+.sliderThumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #f5f5f6;
+  border: var(--rau-hairline) solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  will-change: left;
 }
-.segOn {
-  color: var(--rau-text-primary);
+
+/*
+ * Spring settle: overshoots past the notch, settles back. Discrete levels,
+ * continuous feel. linear() is a CSS spring approximation.
+ */
+.sliderSpring .sliderFill,
+.sliderSpring .sliderThumb {
+  transition:
+    width 680ms
+      linear(
+        0,
+        0.004 0.8%,
+        0.023 2.2%,
+        0.098 5.2%,
+        0.51 14.8%,
+        0.734 20.4%,
+        0.894 26.4%,
+        0.975 31.2%,
+        1.02 36%,
+        1.046 41.6%,
+        1.05 45.2%,
+        1.036 52%,
+        1.006 66%,
+        0.997 76%,
+        1
+      ),
+    left 680ms
+      linear(
+        0,
+        0.004 0.8%,
+        0.023 2.2%,
+        0.098 5.2%,
+        0.51 14.8%,
+        0.734 20.4%,
+        0.894 26.4%,
+        0.975 31.2%,
+        1.02 36%,
+        1.046 41.6%,
+        1.05 45.2%,
+        1.036 52%,
+        1.006 66%,
+        0.997 76%,
+        1
+      ),
+    background-color 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.seg:disabled {
-  color: var(--rau-text-disabled);
-  cursor: default;
+
+@supports not (transition-timing-function: linear(0, 1)) {
+  .sliderSpring .sliderFill,
+  .sliderSpring .sliderThumb {
+    transition:
+      width 680ms cubic-bezier(0.22, 1.7, 0.36, 1),
+      left 680ms cubic-bezier(0.22, 1.7, 0.36, 1),
+      background-color 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .panel {
     animation: none;
+  }
+  .thinkingValue {
+    transition: none;
+  }
+  .sliderSpring .sliderFill,
+  .sliderSpring .sliderThumb {
+    transition: none;
   }
 }

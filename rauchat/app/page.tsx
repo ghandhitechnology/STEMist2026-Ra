@@ -18,6 +18,7 @@ import { TelemetryPanel } from "@/components/telemetry";
 import { DiagramPanel } from "@/components/diagrams";
 import { collectDiagrams } from "@/lib/diagrams";
 import { Sidebar } from "@/components/sidebar/Sidebar";
+import shell from "./shell.module.css";
 import {
   AccountModal,
   type Account,
@@ -40,6 +41,7 @@ import type {
   Diagram,
   Conversation,
   Message,
+  MessageAttachment,
   Skill,
   SkillDraft,
   ToolEvent,
@@ -141,6 +143,33 @@ export default function Home() {
 
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [unavailableTools, setUnavailableTools] = useState<
+    Partial<Record<ToolName, string>>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/models")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { tools?: { browser_use?: boolean } } | null) => {
+        if (cancelled || !data) return;
+        setUnavailableTools(
+          data.tools?.browser_use
+            ? {}
+            : {
+                browser_use:
+                  "Set BROWSERBASE_API_KEY in your machine environment and restart Rauchat.",
+              }
+        );
+      })
+      .catch(() => {
+        /* leave tools available; server will error clearly if misconfigured */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // "/auto" mode: every tool is loaded each turn and the agent decides when
   // to use them. Persisted so it survives reloads.
@@ -331,6 +360,7 @@ export default function Home() {
         role: "assistant",
         content: msg.content,
         createdAt: Date.now(),
+        thinking: msg.thinking || undefined,
         toolEvents: msg.toolEvents.length ? msg.toolEvents : undefined,
         traitSnapshot: msg.traitSnapshot ?? undefined,
       };
@@ -409,9 +439,34 @@ export default function Home() {
   );
 
   const handleSend = useCallback(
-    (submission: ComposerSubmission) => {
+    async (submission: ComposerSubmission) => {
       const text = submission.text.trim();
-      if (!text) return;
+      const pendingFiles = submission.files;
+      if (!text && pendingFiles.length === 0) return;
+      setComposerError(null);
+
+      let attachments: MessageAttachment[] | undefined;
+      if (pendingFiles.length > 0) {
+        const form = new FormData();
+        for (const file of pendingFiles) form.append("file", file);
+        const uploadRes = await fetch("/api/files/upload", {
+          method: "POST",
+          body: form,
+        });
+        const uploadBody = (await uploadRes.json().catch(() => null)) as {
+          error?: unknown;
+          files?: MessageAttachment[];
+        } | null;
+        if (!uploadRes.ok || !Array.isArray(uploadBody?.files)) {
+          const message =
+            typeof uploadBody?.error === "string"
+              ? uploadBody.error
+              : "Could not upload the attachment.";
+          setComposerError(message);
+          throw new Error(message);
+        }
+        attachments = uploadBody.files;
+      }
 
       let conversation = store.activeConversation;
       if (!conversation) {
@@ -428,8 +483,9 @@ export default function Home() {
       const userMessage: Message = {
         id: generateId(),
         role: "user",
-        content: text,
+        content: text || "See attached file(s).",
         createdAt: Date.now(),
+        ...(attachments?.length ? { attachments } : {}),
       };
       store.appendMessage(conversationId, userMessage);
 
@@ -439,19 +495,24 @@ export default function Home() {
       salvageInterruptedTurn(conversationId);
 
       const model = getModel(conversation.modelId ?? modelChoice.modelId);
+      const tools = new Set<ToolName>(submission.tools);
+      if (attachments?.length) tools.add("file_read");
+
       pendingConversationIdRef.current = conversationId;
       setStreamOwnerId(conversationId);
       void chat.send({
         messages: [...conversation.messages, userMessage],
         conversationId,
-        tools: submission.tools,
+        tools: Array.from(tools),
         skillId: submission.skillId,
         forceTools: submission.forceTools,
+        autoTools: submission.autoTools,
         model: model.id,
         thinking: clampThinking(
           model,
           conversation.thinking ?? modelChoice.thinking
         ),
+        attachments,
       });
     },
     [chat, store, modelChoice, salvageInterruptedTurn]
@@ -639,37 +700,17 @@ export default function Home() {
       .filter((s): s is TraitSnapshot => Boolean(s));
   }, [store.activeConversation]);
 
+  const shellClass = [
+    shell.shell,
+    sidebarCollapsed ? shell.sidebarCollapsed : "",
+    telemetryCollapsed ? shell.telemetryCollapsed : "",
+    openDiagram ? shell.withDiagram : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      style={{
-        display: "grid",
-        // Keep both side columns explicit. In particular, the right telemetry
-        // track must remain pinned to the viewport while the left sidebar
-        // animates between its panel and rail widths.
-        // With a diagram open the telemetry column drops to its rail so the
-        // panel gets real width without squeezing the transcript.
-        gridTemplateColumns: [
-          sidebarCollapsed
-            ? "var(--rau-sidebar-w-collapsed)"
-            : "var(--rau-sidebar-w)",
-          "minmax(0, 1fr)",
-          openDiagram ? "minmax(0, clamp(380px, 42%, 760px))" : null,
-          telemetryCollapsed
-            ? "var(--rau-telemetry-w-rail)"
-            : "var(--rau-telemetry-w)",
-        ]
-          .filter(Boolean)
-          .join(" "),
-        // Without an explicit row, the implicit `auto` row grows with content
-        // and every column overflows 100vh — which breaks internal scrollers
-        // (their height: 100% resolves against the oversized row).
-        gridTemplateRows: "minmax(0, 1fr)",
-        height: "100vh",
-        overflow: "hidden",
-        transition:
-          "grid-template-columns var(--rau-dur-slow) var(--rau-ease-inout)",
-      }}
-    >
+    <div className={shellClass}>
       <Sidebar
         store={store}
         onOpenSkills={() => setSkillsOpen(true)}
@@ -707,6 +748,7 @@ export default function Home() {
         onToggleTelemetry={toggleTelemetry}
         onBranchConversation={handleBranchConversation}
         defaultTools={DEFAULT_TOOLS}
+        unavailableTools={unavailableTools}
         autoTools={autoTools}
         onToggleAutoTools={toggleAutoTools}
         skills={skills}
@@ -718,6 +760,8 @@ export default function Home() {
         onOpenDiagram={handleOpenDiagram}
         openDiagramId={openDiagramId}
         resolveDownloadUrl={resolveDownloadUrl}
+        composerError={composerError}
+        onDismissComposerError={() => setComposerError(null)}
       />
 
       {openDiagram ? (

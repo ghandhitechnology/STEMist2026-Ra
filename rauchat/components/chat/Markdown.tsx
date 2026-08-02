@@ -16,6 +16,10 @@ import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
+import { normalizeMathDelimiters } from "@/lib/markdown-math";
 import styles from "./chat.module.css";
 import { IconCheck, IconCopy } from "./icons";
 
@@ -313,7 +317,26 @@ const streamingComponents: Components = {
   ),
 };
 
-const REMARK_PLUGINS = [remarkGfm];
+const REMARK_PLUGINS = [remarkGfm, remarkMath];
+const REHYPE_PLUGINS: import("unified").PluggableList = [
+  [
+    rehypeKatex,
+    {
+      errorColor: "var(--rau-danger)",
+      strict: false,
+      // KaTeX has no real ≠ glyph: stock \neq overlays a combining slash on
+      // "=" off-centre, and falling back to a raw U+2260 char picks up CJK
+      // system fonts that draw the stroke vertically. Instead the "=" is
+      // tagged with a class and the diagonal is drawn in CSS (.rau-neq in
+      // chat.module.css) — font-independent. \ne and a literal ≠ both
+      // expand through \neq, so this also covers the /= rewrite in
+      // lib/markdown-math.
+      macros: { "\\neq": "\\mathrel{\\htmlClass{rau-neq}{=}}" },
+      // \htmlClass needs trust; nothing else (\href, \htmlStyle…) gets it.
+      trust: (ctx: { command: string }) => ctx.command === "\\htmlClass",
+    },
+  ],
+];
 
 export type MarkdownProps = {
   content: string;
@@ -332,13 +355,15 @@ export const Markdown = memo(function Markdown({
   className,
   streaming = false,
 }: MarkdownProps) {
+  const normalized = useMemo(() => normalizeMathDelimiters(content), [content]);
   return (
     <div className={className ? `${styles.prose} ${className}` : styles.prose}>
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
+        rehypePlugins={REHYPE_PLUGINS}
         components={streaming ? streamingComponents : components}
       >
-        {content}
+        {normalized}
       </ReactMarkdown>
     </div>
   );

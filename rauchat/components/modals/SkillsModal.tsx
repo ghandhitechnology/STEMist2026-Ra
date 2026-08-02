@@ -35,8 +35,10 @@ const CAPABILITY_TOOLS: Array<{ id: ToolName; label: string }> = [
   { id: "file_read", label: "Read files" },
   { id: "file_write", label: "Write files" },
   { id: "skill_make", label: "Draft skills" },
-  { id: "diagram", label: "Create diagrams" },
+  { id: "diagram", label: "Create artifacts" },
+  { id: "svg_render", label: "Inline sketch lean-in" },
   { id: "memory_add", label: "Save memory" },
+  { id: "browser_use", label: "Browser use" },
 ];
 
 type SkillInput = {

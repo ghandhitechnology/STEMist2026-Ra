@@ -34,12 +34,14 @@ const ToolNameSchema = z.enum([
   "file_write",
   "skill_make",
   "diagram",
+  "svg_render",
   "memory_add",
+  "browser_use",
 ]);
 
 const CapabilitiesSchema = z
   .object({
-    tools: z.array(ToolNameSchema).max(8).optional().default([]),
+    tools: z.array(ToolNameSchema).max(12).optional().default([]),
     // Imported/generated drafts may use a dependency's id or exact name.
     skills: z.array(z.string().trim().min(1).max(100)).max(20).optional().default([]),
   })

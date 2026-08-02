@@ -356,6 +356,26 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.messageAttachRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rau-space-3);
+  margin-bottom: var(--rau-space-3);
+}
+.messageAttachChip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--rau-space-8);
+  padding: 0 var(--rau-space-4);
+  background: var(--rau-bg-inset);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-sm);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-secondary);
+  max-width: 220px;
+  white-space: nowrap;
+}
 .userActions {
   align-self: flex-start;
 }
@@ -618,6 +638,36 @@
 
 .prose p {
   margin: 0 0 var(--rau-space-6);
+}
+
+/* KaTeX math (§4.7) — inherit prose colour; display blocks get breathing
+   room and scroll sideways instead of overflowing the 68ch measure. KaTeX's
+   default 1.21em reads oversized against the chat type scale. */
+.prose :global(.katex) {
+  font-size: 1.06em;
+}
+.prose :global(.katex-display) {
+  margin: var(--rau-space-6) 0;
+  padding: var(--rau-space-1) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* ≠ — a KaTeX "=" with the diagonal drawn here (see the \neq macro in
+   Markdown.tsx). The "=" centres on the math axis (~box centre), so the
+   slash centres on the box and leans bottom-left → top-right. */
+.prose :global(.rau-neq) {
+  position: relative;
+}
+.prose :global(.rau-neq)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 0.62em;
+  width: 0.055em;
+  border-radius: 0.03em;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(20deg);
 }
 
 .prose h1 {
@@ -1026,6 +1076,143 @@
   font-size: var(--rau-fs-mini);
   line-height: var(--rau-lh-mini);
   color: var(--rau-text-tertiary);
+}
+
+/* ------------------------------------------------------------
+   Reasoning disclosure — "Thinking" at the top of the assistant turn,
+   under the header row. Header is a quiet text button with a rotating
+   chevron; the body (reasoning trace + working tool cards) expands via
+   grid-template-rows like §7 cards.
+   ------------------------------------------------------------ */
+
+.reasoning {
+  margin-bottom: var(--rau-space-4);
+  animation: cardEnter var(--rau-dur-base) var(--rau-ease-standard);
+}
+.reasoningHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rau-space-2);
+  height: 24px;
+  padding: 0 var(--rau-space-3) 0 var(--rau-space-2);
+  margin-left: calc(-1 * var(--rau-space-2));
+  border: 0;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color var(--rau-dur-instant) var(--rau-ease-standard);
+}
+.reasoningHeader:hover {
+  background: var(--rau-fill-hover);
+}
+.reasoningChevron {
+  display: flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--rau-text-quaternary);
+  transform: rotate(-90deg);
+  transition: transform var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.reasoningChevronOpen {
+  transform: rotate(0deg);
+}
+.reasoningLabel {
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-tertiary);
+  transition: color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.reasoningHeader:hover .reasoningLabel {
+  color: var(--rau-text-secondary);
+}
+/* Live turn: a light sheen sweeps the label while reasoning streams. */
+.reasoningLabelActive {
+  background: linear-gradient(
+    90deg,
+    var(--rau-text-tertiary) 30%,
+    var(--rau-text-primary) 50%,
+    var(--rau-text-tertiary) 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: reasoningSheen 2200ms linear infinite;
+}
+@keyframes reasoningSheen {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.reasoningCount {
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--rau-text-quaternary);
+}
+.reasoningGrid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--rau-dur-base) var(--rau-ease-standard);
+}
+.reasoningGridOpen {
+  grid-template-rows: 1fr;
+}
+.reasoningClip {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 130ms var(--rau-ease-standard) 40ms;
+}
+.reasoningGridOpen > .reasoningClip {
+  opacity: 1;
+}
+.reasoningBody {
+  margin-top: var(--rau-space-3);
+  padding-left: var(--rau-space-5);
+  border-left: 2px solid var(--rau-border-subtle);
+}
+.reasoningText {
+  max-height: 260px;
+  overflow-y: auto;
+}
+/* Reasoning renders as real markdown, but muted and one step smaller than
+   the reply — and with headings tamed to body scale so a trace that uses
+   `#` never shouts louder than the answer itself. */
+.reasoningProse {
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-xs);
+  color: var(--rau-text-tertiary);
+}
+.reasoningProse p,
+.reasoningProse ul,
+.reasoningProse ol {
+  margin-bottom: var(--rau-space-4);
+}
+.reasoningProse h1,
+.reasoningProse h2,
+.reasoningProse h3,
+.reasoningProse h4,
+.reasoningProse h5,
+.reasoningProse h6 {
+  margin: var(--rau-space-5) 0 var(--rau-space-2);
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  font-weight: var(--rau-fw-semibold);
+  letter-spacing: var(--rau-ls-snug);
+}
+.reasoningProse strong {
+  color: var(--rau-text-secondary);
 }
 .cardErrorBody {
   padding: var(--rau-space-4) var(--rau-space-5);
@@ -1438,6 +1625,42 @@
   color: var(--rau-success);
 }
 
+/* svg_render — transparent line drawings; ink follows --rau-text-primary. */
+.svgFigure {
+  margin: 0;
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-lg);
+  overflow: hidden;
+  background: transparent;
+}
+.svgCanvas {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  background: transparent;
+  color: var(--rau-text-primary);
+  overflow: auto;
+  min-height: 80px;
+}
+.svgCanvas > svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 420px;
+  background: transparent;
+}
+.svgCaption {
+  margin: 0;
+  padding: var(--rau-space-3) var(--rau-space-4);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-tertiary);
+  text-align: center;
+  border-top: var(--rau-hairline) solid var(--rau-border-faint);
+}
+
 /* §7 grouping */
 .groupChildren {
   margin-left: var(--rau-space-5);
@@ -1660,26 +1883,6 @@
   color: var(--rau-text-disabled);
   cursor: not-allowed;
   background: transparent;
-}
-/* §4.6 running — a 1px accent underline sweeping 0 → 100% */
-.chipRunning::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: var(--rau-accent);
-  transform-origin: left center;
-  animation: chipSweep 1200ms var(--rau-ease-linear) infinite;
-}
-@keyframes chipSweep {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
 }
 .chipIcon {
   display: flex;
@@ -1952,15 +2155,17 @@
   .fadeWord {
     animation: none;
   }
-  .chipRunning::after {
-    animation: none;
-    transform: scaleX(1);
-  }
   .shimmerRow {
     animation: none;
   }
   .card,
-  .popover {
+  .popover,
+  .reasoning {
     animation: none;
+  }
+  .reasoningLabelActive {
+    animation: none;
+    background: none;
+    color: var(--rau-text-secondary);
   }
 }

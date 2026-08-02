@@ -9,10 +9,11 @@
  */
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { Diagram, Message, ToolEvent } from "@/lib/types";
+import type { Diagram, Message, ToolEvent, ToolName } from "@/lib/types";
 import { useSmoothText } from "@/lib/useSmoothStream";
 import styles from "./chat.module.css";
 import { Markdown } from "./Markdown";
+import { ThinkingSection } from "./ThinkingSection";
 import { ToolEventList, toolRunningVerb } from "./ToolEventCard";
 import {
   IconBranch,
@@ -25,6 +26,22 @@ import {
 } from "./icons";
 
 const MAX_TURN_HEIGHT = 1600; // §8 long message truncation
+
+/**
+ * Tools whose completed result is the deliverable itself (an artifact card,
+ * an inline sketch, a download, an installable skill). They render inline in
+ * the transcript; everything else is working trace and lives in the
+ * "Thinking" disclosure. Running/errored calls always count as trace.
+ */
+const DELIVERABLE_TOOLS: ReadonlySet<ToolName> = new Set([
+  "diagram",
+  "svg_render",
+  "pdf_create",
+  "skill_make",
+]);
+
+const isDeliverable = (e: ToolEvent) =>
+  e.status === "done" && DELIVERABLE_TOOLS.has(e.tool);
 
 export type MessageActions = {
   onRegenerate?: (message: Message) => void;
@@ -217,17 +234,41 @@ export const MessageItem = memo(function MessageItem({
   }, [message.role, message.content, isStreaming, expandedTurn]);
 
   if (message.role === "user") {
+    const attachments = message.attachments ?? [];
     return (
       <article className={`${styles.turn} ${styles.userTurn}`} data-role="user">
-        <div className={styles.userBlock}>{message.content}</div>
+        <div className={styles.userBlock}>
+          {attachments.length > 0 ? (
+            <div className={styles.messageAttachRow}>
+              {attachments.map((att) => (
+                <span
+                  key={att.path}
+                  className={styles.messageAttachChip}
+                  title={att.path}
+                >
+                  <span className={styles.attachName}>{att.name}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {message.content}
+        </div>
         <ActionBar message={message} className={styles.userActions} {...actions} />
       </article>
     );
   }
 
   const toolEvents = message.toolEvents ?? [];
+  const deliverableEvents = toolEvents.filter(isDeliverable);
+  const traceEvents = toolEvents.filter((e) => !isDeliverable(e));
+  const thinkingText = message.thinking ?? "";
+  const hasTrace = thinkingText.length > 0 || traceEvents.length > 0;
+
   const runningTool = toolEvents.find((e) => e.status === "running");
-  const showThinking = isStreaming && smoothContent.length === 0;
+  // The bare squares indicator only covers the gap before anything at all
+  // has streamed — once reasoning or tool trace exists, the "Thinking"
+  // disclosure is the live surface.
+  const showThinking = isStreaming && smoothContent.length === 0 && !hasTrace;
   const thinkingLabel =
     statusLabel ?? (runningTool ? toolRunningVerb(runningTool.tool) : "Thinking");
 
@@ -253,9 +294,22 @@ export const MessageItem = memo(function MessageItem({
         ref={bodyRef}
         className={`${styles.assistantBody} ${showClamp ? styles.clamped : ""}`}
       >
-        {toolEvents.length > 0 ? (
+        {hasTrace ? (
+          <ThinkingSection
+            thinking={thinkingText}
+            events={traceEvents}
+            isStreaming={isStreaming}
+            onRetry={onRetryToolEvent}
+            onInstallSkill={onInstallSkill}
+            onOpenDiagram={onOpenDiagram}
+            openDiagramId={openDiagramId}
+            resolveDownloadUrl={resolveDownloadUrl}
+          />
+        ) : null}
+
+        {deliverableEvents.length > 0 ? (
           <ToolEventList
-            events={toolEvents}
+            events={deliverableEvents}
             onRetry={onRetryToolEvent}
             onInstallSkill={onInstallSkill}
             onOpenDiagram={onOpenDiagram}
