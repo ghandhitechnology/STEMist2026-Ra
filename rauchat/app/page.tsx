@@ -139,6 +139,7 @@ export default function Home() {
   }, [refreshAccount]);
 
   const [telemetryCollapsed, setTelemetryCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // "/auto" mode: every tool is loaded each turn and the agent decides when
   // to use them. Persisted so it survives reloads.
@@ -614,13 +615,15 @@ export default function Home() {
     <div
       style={{
         display: "grid",
-        // Sidebar manages its own collapse/peek state internally and sizes
-        // itself via CSS (264px <-> 56px rail); `auto` lets this track
-        // follow that intrinsic width instead of leaving dead space.
+        // Keep both side columns explicit. In particular, the right telemetry
+        // track must remain pinned to the viewport while the left sidebar
+        // animates between its panel and rail widths.
         // With a diagram open the telemetry column drops to its rail so the
         // panel gets real width without squeezing the transcript.
         gridTemplateColumns: [
-          "auto",
+          sidebarCollapsed
+            ? "var(--rau-sidebar-w-collapsed)"
+            : "var(--rau-sidebar-w)",
           "minmax(0, 1fr)",
           openDiagram ? "minmax(0, clamp(380px, 42%, 760px))" : null,
           telemetryCollapsed
@@ -635,6 +638,8 @@ export default function Home() {
         gridTemplateRows: "minmax(0, 1fr)",
         height: "100vh",
         overflow: "hidden",
+        transition:
+          "grid-template-columns var(--rau-dur-slow) var(--rau-ease-inout)",
       }}
     >
       <Sidebar
@@ -649,6 +654,7 @@ export default function Home() {
         onTitleAnimationEnd={handleTitleAnimationEnd}
         skillsCount={skills.length}
         filesCount={filesCount}
+        onCollapsedChange={setSidebarCollapsed}
       />
 
       <ChatView

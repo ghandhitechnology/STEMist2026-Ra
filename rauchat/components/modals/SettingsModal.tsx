@@ -2,8 +2,9 @@
 
 /**
  * components/modals/SettingsModal.tsx
- * Sections: Model (inner model id, temperature), Telemetry (Gemma endpoint
- * status readout, poll interval), Data (clear local conversations).
+ * Sections: Model (inner model id, temperature), Memory (durable user memory),
+ * Telemetry (Gemma endpoint status readout, poll interval), and Data
+ * (clear local conversations).
  * Persists to localStorage under 'rauchat:settings'.
  */
 
@@ -86,13 +87,49 @@ export function SettingsModal({
   const [settings, setSettings] = useState<RauchatSettings>(DEFAULT_SETTINGS);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [cleared, setCleared] = useState(false);
+  const [memory, setMemory] = useState("");
+  const [savedMemory, setSavedMemory] = useState("");
+  const [memoryState, setMemoryState] = useState<
+    "idle" | "loading" | "saving" | "saved" | "error"
+  >("idle");
+  const [memoryError, setMemoryError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
-      setSettings(loadSettings());
-      setConfirmingClear(false);
-      setCleared(false);
-    }
+    if (!open) return;
+
+    setSettings(loadSettings());
+    setConfirmingClear(false);
+    setCleared(false);
+    setMemory("");
+    setSavedMemory("");
+    setMemoryState("loading");
+    setMemoryError(null);
+
+    const controller = new AbortController();
+    fetch("/api/memory", {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Stored memory could not be loaded.");
+        return (await response.json()) as { memory?: unknown };
+      })
+      .then((data) => {
+        const next = typeof data.memory === "string" ? data.memory : "";
+        setMemory(next);
+        setSavedMemory(next);
+        setMemoryState("idle");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setMemoryState("error");
+        setMemoryError(
+          error instanceof Error ? error.message : "Stored memory could not be loaded."
+        );
+      });
+
+    return () => controller.abort();
   }, [open]);
 
   function patch(next: Partial<RauchatSettings>) {
@@ -110,6 +147,26 @@ export function SettingsModal({
     setConfirmingClear(false);
     setCleared(true);
     onConversationsCleared?.();
+  }
+
+  async function handleSaveMemory() {
+    setMemoryState("saving");
+    setMemoryError(null);
+    try {
+      const response = await fetch("/api/memory", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ memory }),
+      });
+      if (!response.ok) throw new Error("Stored memory could not be saved.");
+      setSavedMemory(memory);
+      setMemoryState("saved");
+    } catch (error) {
+      setMemoryState("error");
+      setMemoryError(
+        error instanceof Error ? error.message : "Stored memory could not be saved."
+      );
+    }
   }
 
   return (
@@ -135,22 +192,79 @@ export function SettingsModal({
             Temperature
           </label>
           <div className={styles.rangeRow}>
-            <input
-              id="rau-settings-temp"
-              className={styles.range}
-              type="range"
-              min={0}
-              max={2}
-              step={0.05}
-              value={settings.temperature}
-              onChange={(event) =>
-                patch({ temperature: Number(event.target.value) })
-              }
-            />
+            <div className={styles.rangeControl}>
+              <input
+                id="rau-settings-temp"
+                className={styles.range}
+                type="range"
+                min={0}
+                max={2}
+                step={0.05}
+                value={settings.temperature}
+                onChange={(event) =>
+                  patch({ temperature: Number(event.target.value) })
+                }
+              />
+              <span className={styles.rangeMidpoint} title="1.0" aria-hidden />
+            </div>
             <span className={`${styles.rangeValue} rau-num`}>
               {settings.temperature.toFixed(2)}
             </span>
           </div>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h3 className={styles.sectionLabel}>Memory</h3>
+        <p className={styles.memoryHint}>
+          Facts saved here are available to Rauchat in future conversations.
+        </p>
+        <textarea
+          className={styles.memoryEditor}
+          value={memory}
+          onChange={(event) => {
+            setMemory(event.target.value);
+            if (memoryState === "saved" || memoryState === "error") {
+              setMemoryState("idle");
+              setMemoryError(null);
+            }
+          }}
+          placeholder={
+            memoryState === "loading" ? "Loading stored memory…" : "No stored memory yet."
+          }
+          aria-label="Stored memory"
+          disabled={memoryState === "loading"}
+          maxLength={20000}
+          spellCheck
+        />
+        <div className={styles.memoryFooter}>
+          <span
+            className={`${styles.memoryStatus} ${
+              memoryState === "error" ? styles.memoryStatusError : ""
+            }`}
+            role={memoryState === "error" ? "alert" : "status"}
+          >
+            {memoryError ??
+              (memoryState === "loading"
+                ? "Loading…"
+                : memoryState === "saving"
+                  ? "Saving…"
+                  : memoryState === "saved"
+                    ? "Saved"
+                    : `${memory.length.toLocaleString()} / 20,000`)}
+          </span>
+          <button
+            type="button"
+            className={`${styles.button} ${styles.buttonSecondary}`}
+            onClick={() => void handleSaveMemory()}
+            disabled={
+              memoryState === "loading" ||
+              memoryState === "saving" ||
+              memory === savedMemory
+            }
+          >
+            Save memory
+          </button>
         </div>
       </section>
 

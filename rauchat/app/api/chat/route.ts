@@ -417,7 +417,14 @@ export async function POST(req: NextRequest) {
           response: finalAssistantText,
           model: model.openrouterId,
         },
-        messages.length
+        // One telemetry point per user/assistant exchange. `messages.length`
+        // counts both roles and produced indexes 0, 2, 4..., which made the
+        // history renderer interpret every real reading as separated by a
+        // missing turn.
+        Math.max(
+          0,
+          messages.filter((message) => message.role === "user").length - 1
+        )
       );
       if (snapshot) {
         send("trait_snapshot", snapshot);

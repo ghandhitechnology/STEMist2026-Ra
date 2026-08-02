@@ -56,6 +56,8 @@ export type SidebarProps = {
   onTitleAnimationEnd?: (id: string) => void;
   skillsCount?: number;
   filesCount?: number;
+  /** Keeps the parent grid track in sync with the rail/panel animation. */
+  onCollapsedChange?: (collapsed: boolean) => void;
 };
 
 export function Sidebar({
@@ -70,6 +72,7 @@ export function Sidebar({
   onTitleAnimationEnd,
   skillsCount,
   filesCount,
+  onCollapsedChange,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [peeking, setPeeking] = useState(false);
@@ -112,6 +115,12 @@ export function Sidebar({
     setQuery(event.target.value);
   }
 
+  function handleToggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    onCollapsedChange?.(next);
+  }
+
   const showExpanded = !collapsed || peeking;
 
   // Three shapes, no inline styles: the 56px rail, the same rail peeked open
@@ -142,7 +151,7 @@ export function Sidebar({
           type="button"
           className={styles.iconButton}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={handleToggleCollapsed}
         >
           <IconPanel size={16} />
         </button>

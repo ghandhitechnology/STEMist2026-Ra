@@ -86,9 +86,31 @@
   gap: var(--rau-space-5);
 }
 
-.range {
+.rangeControl {
+  position: relative;
+  display: flex;
+  align-items: center;
   flex: 1;
+  min-width: 0;
+}
+
+.range {
+  width: 100%;
   accent-color: var(--rau-accent);
+  position: relative;
+  z-index: 1;
+}
+
+.rangeMidpoint {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 8px;
+  background: var(--rau-border-strong);
+  transform: translate(-0.5px, -50%);
+  pointer-events: none;
 }
 
 .rangeValue {
@@ -156,6 +178,71 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.memoryHint {
+  margin: calc(-1 * var(--rau-space-2)) 0 var(--rau-space-4);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-tertiary);
+}
+
+.memoryEditor {
+  display: block;
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  padding: var(--rau-space-4) var(--rau-space-5);
+  border: 1px solid var(--rau-border-default);
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-bg-inset);
+  color: var(--rau-text-primary);
+  caret-color: var(--rau-accent);
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-mini);
+  line-height: 18px;
+  transition:
+    border-color var(--rau-dur-fast) var(--rau-ease-standard),
+    background-color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+
+.memoryEditor::placeholder {
+  color: var(--rau-text-quaternary);
+}
+
+.memoryEditor:hover:not(:disabled) {
+  border-color: var(--rau-border-strong);
+}
+
+.memoryEditor:focus {
+  outline: none;
+  border-color: var(--rau-accent);
+  background: var(--rau-bg-l2);
+}
+
+.memoryEditor:disabled {
+  color: var(--rau-text-disabled);
+  cursor: wait;
+}
+
+.memoryFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rau-space-4);
+  margin-top: var(--rau-space-4);
+}
+
+.memoryStatus {
+  min-width: 0;
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  color: var(--rau-text-quaternary);
+}
+
+.memoryStatusError {
+  color: var(--rau-danger);
 }
 
 .dangerRow {
@@ -243,6 +330,13 @@
 .button:focus-visible {
   box-shadow: var(--rau-focus-ring);
   outline: none;
+}
+
+.button:disabled {
+  background: var(--rau-fill-disabled);
+  border-color: var(--rau-border-subtle);
+  color: var(--rau-text-disabled);
+  cursor: not-allowed;
 }
 
 .confirmBar {

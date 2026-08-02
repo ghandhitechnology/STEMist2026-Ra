@@ -117,24 +117,26 @@ export function TraitHistory({
 
   const slots: Slot[] = useMemo(() => {
     if (dormant || snapshots.length === 0) return [];
-    const byTurn = new Map<number, TraitSnapshot>();
-    let latest = -Infinity;
-    for (const snap of snapshots) {
-      byTurn.set(snap.turnIndex, snap);
-      if (snap.turnIndex > latest) latest = snap.turnIndex;
-    }
-    const first = latest - windowSize + 1;
-    const out: Slot[] = [];
-    for (let t = first; t <= latest; t++) {
-      const snap = byTurn.get(t);
-      if (!snap) {
-        out.push({ turnIndex: t, timestamp: null, values: {}, present: false });
-        continue;
-      }
+
+    // Snapshots are already chronological. Plot the last N readings as a
+    // continuous trailing window rather than treating gaps in their stored
+    // turnIndex values as missing telemetry. Older conversations used raw
+    // message indexes (0, 2, 4...) for this field, which otherwise breaks
+    // every polyline into a collection of isolated current-value dots.
+    const recent = snapshots.slice(-windowSize);
+    const padding = Math.max(0, windowSize - recent.length);
+    const out: Slot[] = Array.from({ length: padding }, (_, i) => ({
+      turnIndex: recent[0].turnIndex - padding + i,
+      timestamp: null,
+      values: {},
+      present: false,
+    }));
+
+    for (const snap of recent) {
       const values: Partial<Record<TraitId, number>> = {};
       for (const r of snap.readings) values[r.traitId] = r.score;
       out.push({
-        turnIndex: t,
+        turnIndex: snap.turnIndex,
         timestamp: snap.timestamp,
         values,
         present: true,
