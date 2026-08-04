@@ -58,6 +58,7 @@ import type {
   TelemetryStatus,
 } from "@/lib/types";
 import { TRAIT_AXES } from "@/lib/types";
+import { readGemmaRuntimeConfig } from "@/lib/server/gemma-runtime-config";
 
 const HEALTH_TIMEOUT_MS = 4000;
 const PROJECT_TIMEOUT_MS = Number(process.env.GEMMA_PROJECT_TIMEOUT_MS) || 60000;
@@ -89,17 +90,26 @@ export type TraitProjectionInput = {
   model?: string;
 };
 
-function endpointHeaders(extra?: Record<string, string>): Record<string, string> {
+function endpointHeaders(
+  apiKey: string | undefined,
+  extra?: Record<string, string>
+): Record<string, string> {
   const headers: Record<string, string> = { ...extra };
-  const apiKey = process.env.GEMMA_API_KEY;
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
   return headers;
 }
 
-function baseUrl(): string | null {
-  const url = process.env.GEMMA_ENDPOINT_URL;
+async function endpointConfig(): Promise<{
+  url: string;
+  apiKey?: string;
+} | null> {
+  const runtimeConfig = await readGemmaRuntimeConfig();
+  const url = runtimeConfig?.endpointUrl || process.env.GEMMA_ENDPOINT_URL;
   if (!url) return null;
-  return url.replace(/\/+$/, "");
+  return {
+    url: url.replace(/\/+$/, ""),
+    apiKey: runtimeConfig?.apiKey || process.env.GEMMA_API_KEY,
+  };
 }
 
 /**
@@ -108,14 +118,14 @@ function baseUrl(): string | null {
  * instead of rejecting.
  */
 export async function getTraitStatus(): Promise<TraitStatusResponse> {
-  const url = baseUrl();
-  if (!url) {
+  const endpoint = await endpointConfig();
+  if (!endpoint) {
     return { status: "disconnected", model: "gemma-4-12b" };
   }
 
   try {
-    const res = await fetch(`${url}/health`, {
-      headers: endpointHeaders(),
+    const res = await fetch(`${endpoint.url}/health`, {
+      headers: endpointHeaders(endpoint.apiKey),
       signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
     });
     const data = (await res.json().catch(() => ({}))) as {
@@ -169,12 +179,14 @@ export async function getTraitSnapshot(
   input: TraitProjectionInput,
   turnIndex: number
 ): Promise<TraitSnapshot | null> {
-  const url = baseUrl();
-  if (!url) return null;
+  const endpoint = await endpointConfig();
+  if (!endpoint) return null;
 
-  const res = await fetch(`${url}/project`, {
+  const res = await fetch(`${endpoint.url}/project`, {
     method: "POST",
-    headers: endpointHeaders({ "Content-Type": "application/json" }),
+    headers: endpointHeaders(endpoint.apiKey, {
+      "Content-Type": "application/json",
+    }),
     body: JSON.stringify(input),
     signal: AbortSignal.timeout(PROJECT_TIMEOUT_MS),
   });
