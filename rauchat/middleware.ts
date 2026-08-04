@@ -27,7 +27,6 @@ const PUBLIC_PATHS = new Set([
   "/callback",
   "/signout",
   "/api/health",
-  "/api/admin/connect-runpod",
 ]);
 
 function isPublicPath(pathname: string): boolean {
