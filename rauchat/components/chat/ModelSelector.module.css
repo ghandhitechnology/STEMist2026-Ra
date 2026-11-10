@@ -1,0 +1,425 @@
+/**
+ * components/chat/ModelSelector.module.css
+ *
+ * DESIGN.md §3.4 (top bar model string), §4.10 (popover/dropdown menu),
+ * thinking slider (continuous drag, snap-to-level), §5 (motion budget).
+ */
+
+.wrap {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------
+   Trigger — a ghost button standing in for §3.4's model string
+   ------------------------------------------------------------ */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rau-space-1);
+  height: 22px;
+  max-width: 240px;
+  padding: 0 var(--rau-space-2) 0 var(--rau-space-3);
+  border: var(--rau-hairline) solid transparent;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-tertiary);
+  font-family: inherit;
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  letter-spacing: var(--rau-ls-snug);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    border-color var(--rau-dur-fast) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.trigger:hover:not(:disabled) {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+.trigger:active:not(:disabled) {
+  background: var(--rau-fill-active);
+}
+.trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--rau-focus-ring);
+}
+.triggerOpen {
+  background: var(--rau-fill-selected);
+  color: var(--rau-text-primary);
+}
+.trigger:disabled {
+  color: var(--rau-text-quaternary);
+  cursor: default;
+}
+
+.triggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "Luna · Max" — the effort level trails the model name, one step quieter. */
+.triggerDot,
+.triggerEffort {
+  flex: none;
+  color: var(--rau-text-quaternary);
+}
+.trigger:hover:not(:disabled) .triggerDot,
+.trigger:hover:not(:disabled) .triggerEffort,
+.triggerOpen .triggerDot,
+.triggerOpen .triggerEffort {
+  color: var(--rau-text-tertiary);
+}
+.trigger:disabled .triggerDot,
+.trigger:disabled .triggerEffort {
+  color: var(--rau-text-quaternary);
+}
+
+.chevron {
+  flex: none;
+  transition: transform var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* ------------------------------------------------------------
+   Panel (§4.10)
+   ------------------------------------------------------------ */
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--rau-space-3));
+  left: 0;
+  z-index: var(--rau-z-popover);
+  width: 304px;
+  padding: var(--rau-space-2);
+  background: var(--rau-bg-l3);
+  border: var(--rau-hairline) solid var(--rau-border-default);
+  border-radius: var(--rau-radius-lg);
+  box-shadow: var(--rau-elev-popover);
+  animation: menuEnter var(--rau-dur-base) var(--rau-ease-standard);
+}
+
+@keyframes menuEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.list {
+  max-height: 320px;
+  overflow-y: auto;
+  outline: none;
+}
+
+.groupLabel {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--rau-space-4);
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-quaternary);
+}
+
+/* ---- model row ---- */
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  width: 100%;
+  padding: var(--rau-space-3) var(--rau-space-4);
+  border: 0;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-secondary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.item:hover,
+.itemHighlighted {
+  background: var(--rau-fill-hover);
+}
+.item:active {
+  background: var(--rau-fill-active);
+}
+.itemText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.itemLabel {
+  display: block;
+  font-size: var(--rau-fs-xs);
+  line-height: var(--rau-lh-xs);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.itemDesc {
+  display: block;
+  margin-top: var(--rau-space-1);
+  font-size: var(--rau-fs-mini);
+  line-height: var(--rau-lh-mini);
+  color: var(--rau-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.check {
+  display: flex;
+  flex: none;
+  align-items: center;
+  color: var(--rau-accent);
+}
+
+.itemUnavailable {
+  cursor: not-allowed;
+}
+.itemUnavailable:hover,
+.itemUnavailable:active {
+  background: transparent;
+}
+.itemUnavailable .itemLabel {
+  color: var(--rau-text-disabled);
+}
+.itemUnavailable .itemDesc {
+  color: var(--rau-text-disabled);
+}
+.hint {
+  flex: none;
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  letter-spacing: var(--rau-ls-wide);
+  color: var(--rau-text-quaternary);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-xs);
+  padding: 0 var(--rau-space-2);
+}
+
+.separator {
+  height: 1px;
+  margin: var(--rau-space-2) calc(-1 * var(--rau-space-2));
+  background: var(--rau-border-faint);
+}
+
+/* ------------------------------------------------------------
+   Thinking row + continuous snap slider
+   ------------------------------------------------------------ */
+
+.thinking {
+  padding: var(--rau-space-4) var(--rau-space-4) var(--rau-space-3);
+}
+.thinkingHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--rau-space-4);
+}
+.thinkingLabel {
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-caps);
+  text-transform: uppercase;
+  color: var(--rau-text-tertiary);
+}
+.thinkingValue {
+  font-size: var(--rau-fs-micro);
+  line-height: var(--rau-lh-micro);
+  font-weight: var(--rau-fw-medium);
+  letter-spacing: var(--rau-ls-snug);
+  color: var(--rau-accent);
+  white-space: nowrap;
+  /* Soft color drift — no bounce on hue, only on the thumb/fill travel. */
+  transition: color 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.thinkingValueLive {
+  transition: none;
+}
+
+/* Tall hit target, thin visual track (reference pill, scaled down). */
+.slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  margin: 0 calc(-1 * var(--rau-space-1));
+  padding: 0 var(--rau-space-1);
+  outline: none;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.slider:focus-visible .sliderThumb {
+  box-shadow:
+    0 0 0 2px var(--rau-bg-l3),
+    0 0 0 4px rgba(232, 163, 61, 0.45);
+}
+
+.sliderTrack {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--rau-bg-inset);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  overflow: visible;
+}
+
+/* Solid heat color (yellow→red by level), not a multi-stop gradient bar. */
+.sliderFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background-color: var(--rau-accent);
+  pointer-events: none;
+  will-change: width, background-color;
+}
+
+.sliderTicks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.sliderTick {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  transform: translate(-50%, -50%);
+}
+.sliderTickOn {
+  background: rgba(20, 13, 2, 0.35);
+}
+
+.sliderThumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #f5f5f6;
+  border: var(--rau-hairline) solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  will-change: left;
+}
+
+/*
+ * Spring settle: overshoots past the notch, settles back. Discrete levels,
+ * continuous feel. linear() is a CSS spring approximation.
+ */
+.sliderSpring .sliderFill,
+.sliderSpring .sliderThumb {
+  transition:
+    width 680ms
+      linear(
+        0,
+        0.004 0.8%,
+        0.023 2.2%,
+        0.098 5.2%,
+        0.51 14.8%,
+        0.734 20.4%,
+        0.894 26.4%,
+        0.975 31.2%,
+        1.02 36%,
+        1.046 41.6%,
+        1.05 45.2%,
+        1.036 52%,
+        1.006 66%,
+        0.997 76%,
+        1
+      ),
+    left 680ms
+      linear(
+        0,
+        0.004 0.8%,
+        0.023 2.2%,
+        0.098 5.2%,
+        0.51 14.8%,
+        0.734 20.4%,
+        0.894 26.4%,
+        0.975 31.2%,
+        1.02 36%,
+        1.046 41.6%,
+        1.05 45.2%,
+        1.036 52%,
+        1.006 66%,
+        0.997 76%,
+        1
+      ),
+    background-color 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@supports not (transition-timing-function: linear(0, 1)) {
+  .sliderSpring .sliderFill,
+  .sliderSpring .sliderThumb {
+    transition:
+      width 680ms cubic-bezier(0.22, 1.7, 0.36, 1),
+      left 680ms cubic-bezier(0.22, 1.7, 0.36, 1),
+      background-color 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+  .thinkingValue {
+    transition: none;
+  }
+  .sliderSpring .sliderFill,
+  .sliderSpring .sliderThumb {
+    transition: none;
+  }
+}
+
+/* ---- Compact (phone) ----
+   Keep 900px in step with app/shell.module.css. */
+
+@media (max-width: 900px) {
+  .trigger {
+    height: 44px;
+    max-width: 160px;
+  }
+
+  /* The trigger sits mid-bar, so a 304px panel anchored to it runs off the
+     right edge and is clipped by the shell. It spans the viewport instead. */
+  .panel {
+    position: fixed;
+    top: var(--rau-topbar-h);
+    left: var(--rau-space-4);
+    right: var(--rau-space-4);
+    width: auto;
+    max-height: calc(100dvh - var(--rau-topbar-h) - var(--rau-space-8));
+    overflow-y: auto;
+  }
+}

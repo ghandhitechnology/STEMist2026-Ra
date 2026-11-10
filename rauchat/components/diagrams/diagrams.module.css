@@ -1,0 +1,324 @@
+/* components/artifacts — the artifact panel and its inline transcript card. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  background: var(--rau-bg-l1);
+  border-left: var(--rau-hairline) solid var(--rau-border-subtle);
+}
+.panelImmersive,
+.panel:fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--rau-z-modal);
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  background: var(--rau-bg-l1);
+}
+
+/* ---- header ---- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-3);
+  flex: none;
+  height: 48px;
+  padding: 0 var(--rau-space-4) 0 var(--rau-space-6);
+  border-bottom: var(--rau-hairline) solid var(--rau-border-subtle);
+}
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--rau-fs-sm);
+  font-weight: var(--rau-fw-medium);
+  color: var(--rau-text-primary);
+}
+.badge {
+  flex: none;
+  padding: 1px var(--rau-space-3);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-xs);
+  background: var(--rau-bg-inset);
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-micro);
+  letter-spacing: var(--rau-ls-mono);
+  color: var(--rau-text-tertiary);
+  text-transform: lowercase;
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+/* ---- tabs + version selector ---- */
+
+.subbar {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  flex: none;
+  height: 36px;
+  padding: 0 var(--rau-space-4) 0 var(--rau-space-6);
+  border-bottom: var(--rau-hairline) solid var(--rau-border-subtle);
+}
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+.tab {
+  height: 24px;
+  padding: 0 var(--rau-space-4);
+  border: 0;
+  border-radius: var(--rau-radius-sm);
+  background: transparent;
+  color: var(--rau-text-tertiary);
+  font-family: inherit;
+  font-size: var(--rau-fs-mini);
+  font-weight: var(--rau-fw-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--rau-dur-instant) var(--rau-ease-standard),
+    color var(--rau-dur-fast) var(--rau-ease-standard);
+}
+.tab:hover {
+  color: var(--rau-text-secondary);
+}
+.tabOn {
+  background: var(--rau-fill-hover);
+  color: var(--rau-text-primary);
+}
+.versions {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-3);
+  flex: none;
+  font-size: var(--rau-fs-micro);
+  color: var(--rau-text-tertiary);
+}
+.interactionControls {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-3);
+}
+.interactionButton {
+  height: 22px;
+  padding: 0 var(--rau-space-3);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-xs);
+  background: var(--rau-bg-inset);
+  color: var(--rau-text-secondary);
+  font-family: inherit;
+  font-size: var(--rau-fs-micro);
+  cursor: pointer;
+}
+.interactionButton:hover {
+  border-color: var(--rau-border-default);
+  color: var(--rau-text-primary);
+}
+.interactionButton:focus-visible {
+  outline: none;
+  box-shadow: var(--rau-focus-ring);
+}
+.interactionStatus {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rau-space-2);
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-micro);
+  color: var(--rau-text-quaternary);
+  white-space: nowrap;
+}
+.interactionDot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--rau-radius-full);
+  border: var(--rau-hairline) solid var(--rau-text-quaternary);
+}
+.interactionStatusActive {
+  color: var(--rau-text-secondary);
+}
+.interactionStatusActive .interactionDot {
+  border-color: var(--rau-accent);
+  background: var(--rau-accent);
+}
+.interactionStatusLocked {
+  color: var(--rau-accent);
+}
+.interactionStatusLocked .interactionDot {
+  border-color: var(--rau-status-live);
+  background: var(--rau-status-live);
+}
+.versionSelect {
+  height: 22px;
+  padding: 0 var(--rau-space-2);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-xs);
+  background: var(--rau-bg-l2);
+  color: var(--rau-text-secondary);
+  font-family: var(--rau-font-mono);
+  font-size: var(--rau-fs-micro);
+  cursor: pointer;
+}
+.staleFlag {
+  color: var(--rau-accent);
+}
+
+/* ---- body ---- */
+
+.body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--rau-bg-l0);
+}
+.frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ffffff;
+}
+.frameActive {
+  box-shadow: inset 0 0 0 1px var(--rau-border-accent);
+}
+.immersiveHint {
+  position: absolute;
+  left: 50%;
+  bottom: var(--rau-space-5);
+  z-index: var(--rau-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  max-width: calc(100% - 32px);
+  padding: var(--rau-space-3) var(--rau-space-5);
+  border: var(--rau-hairline) solid var(--rau-border-default);
+  border-radius: var(--rau-radius-sm);
+  background: var(--rau-bg-l3);
+  box-shadow: var(--rau-elev-popover);
+  color: var(--rau-text-secondary);
+  font-size: var(--rau-fs-micro);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.immersiveHint span:first-child {
+  color: var(--rau-accent);
+  font-weight: var(--rau-fw-medium);
+}
+.scroll {
+  height: 100%;
+  overflow: auto;
+  padding: var(--rau-space-6);
+}
+.proseScroll {
+  composes: scroll;
+  background: var(--rau-bg-l0);
+}
+
+/* ---- empty / loading ---- */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rau-space-4);
+  height: 100%;
+  padding: var(--rau-space-8);
+  text-align: center;
+  color: var(--rau-text-tertiary);
+  font-size: var(--rau-fs-mini);
+}
+
+/* ---- inline transcript card ---- */
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--rau-space-4);
+  width: 100%;
+  margin: var(--rau-space-4) 0;
+  padding: var(--rau-space-5) var(--rau-space-5);
+  border: var(--rau-hairline) solid var(--rau-border-subtle);
+  border-radius: var(--rau-radius-md);
+  background: var(--rau-bg-l2);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--rau-dur-fast) var(--rau-ease-standard),
+    background-color var(--rau-dur-instant) var(--rau-ease-standard);
+}
+.card:hover {
+  border-color: var(--rau-border-default);
+  background: var(--rau-bg-l3);
+}
+.cardActive {
+  border-color: var(--rau-accent);
+}
+.cardIcon {
+  display: flex;
+  flex: none;
+  color: var(--rau-accent);
+}
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.cardTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--rau-fs-xs);
+  font-weight: var(--rau-fw-medium);
+  color: var(--rau-text-primary);
+}
+.cardMeta {
+  font-size: var(--rau-fs-micro);
+  color: var(--rau-text-tertiary);
+}
+.cardOpen {
+  flex: none;
+  font-size: var(--rau-fs-micro);
+  color: var(--rau-text-tertiary);
+}
+
+/* ---- responsive: narrow viewports get the panel as an overlay ----
+   There is no third column to sit in below this width (app/shell.module.css
+   collapses to one), and the panel's 380px floor would otherwise push the
+   page sideways. It covers the transcript instead, like fullscreen does. */
+
+@media (max-width: 900px) {
+  .panel {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--rau-z-modal) - 10);
+    height: 100dvh;
+    border-left: 0;
+  }
+}
