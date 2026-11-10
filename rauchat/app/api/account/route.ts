@@ -9,6 +9,9 @@
  * session cookie is explicitly expired before returning to /sign-in.
  */
 
+import path from "node:path";
+import { deleteUserWorkflows } from "@/lib/server/workflows/runner";
+import { WORKSPACE_BASE_ROOT, conversationsDirFor, sanitizeUserId } from "@/lib/server/paths";
 import { rm } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { getWorkOS } from "@workos-inc/authkit-nextjs";
@@ -31,6 +34,10 @@ export async function DELETE() {
 
   // Wipe the sandboxed workspace (skills, exports, files) and account metadata.
   try {
+    await deleteUserWorkflows(userId);
+    await rm(path.join(WORKSPACE_BASE_ROOT, "agent-sessions", sanitizeUserId(userId)), { recursive: true, force: true });
+    await rm(path.join(WORKSPACE_BASE_ROOT, "workflow-sessions", sanitizeUserId(userId)), { recursive: true, force: true });
+    await rm(conversationsDirFor(userId), { recursive: true, force: true });
     await rm(userWorkspaceRoot(userId), { recursive: true, force: true });
     await deleteProfile(userId);
     await rm(memoryFile(userId), { force: true });

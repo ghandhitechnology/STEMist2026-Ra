@@ -49,17 +49,13 @@ export type TraitSnapshot = {
 
 export type TelemetryStatus = "disconnected" | "connecting" | "live" | "error";
 
-export type ToolName =
-  | "web_search"
-  | "research"
-  | "pdf_create"
-  | "file_read"
-  | "file_write"
-  | "skill_make"
-  | "diagram"
-  | "svg_render"
-  | "memory_add"
-  | "browser_use";
+export const TOOL_NAMES = [
+  "web_search", "research", "pdf_create", "file_read", "file_write",
+  "skill_make", "diagram", "svg_render", "memory_add", "browser_use",
+  "bash", "read", "write", "edit", "ls", "find", "grep", "web_fetch",
+  "skills_list", "skill_view", "skill_manage", "workflow_run",
+] as const;
+export type ToolName = (typeof TOOL_NAMES)[number];
 
 /**
  * How a diagram is rendered. `html`/`react`/`svg` run in a sandboxed

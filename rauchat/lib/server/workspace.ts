@@ -9,9 +9,10 @@
  * via lib/server/auth.ts and thread it through every call here.
  */
 
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { userWorkspaceRoot, WorkspacePathError } from "./paths";
+import { withWorkspaceLock } from "./workspace-lock";
 
 export { WorkspacePathError };
 
@@ -66,12 +67,34 @@ export function resolveWorkspacePath(userId: string, relPath: string): string {
   return joined;
 }
 
+export async function checkedWorkspacePath(userId: string, relPath: string): Promise<string> {
+  const target = resolveWorkspacePath(userId, relPath);
+  const root = workspaceRootFor(userId);
+  let current = root;
+  for (const part of ["", ...path.relative(root, target).split(path.sep).filter(Boolean)]) {
+    if (part) current = path.join(current, part);
+    try {
+      if ((await lstat(current)).isSymbolicLink()) throw new WorkspacePathError("Workspace paths must not contain symbolic links.");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  return target;
+}
+
+function allowWorkspaceWrite(userId: string, relPath: string) {
+  const relative = path.relative(workspaceRootFor(userId), resolveWorkspacePath(userId, relPath));
+  if (relative === "skills" || relative.startsWith(`skills${path.sep}`)) {
+    throw new WorkspacePathError("Use skill management to change a skill and preserve its revision history.");
+  }
+}
+
 export async function readWorkspaceFile(
   userId: string,
   relPath: string
 ): Promise<string> {
   await ensureWorkspaceDirs(userId);
-  const abs = resolveWorkspacePath(userId, relPath);
+  const abs = await checkedWorkspacePath(userId, relPath);
   return readFile(abs, "utf8");
 }
 
@@ -80,10 +103,13 @@ export async function writeWorkspaceFile(
   relPath: string,
   content: string
 ): Promise<void> {
-  await ensureWorkspaceDirs(userId);
-  const abs = resolveWorkspacePath(userId, relPath);
-  await mkdir(path.dirname(abs), { recursive: true });
-  await writeFile(abs, content, "utf8");
+  allowWorkspaceWrite(userId, relPath);
+  await withWorkspaceLock(userId, async () => {
+    await ensureWorkspaceDirs(userId);
+    const abs = await checkedWorkspacePath(userId, relPath);
+    await mkdir(path.dirname(abs), { recursive: true });
+    await writeFile(abs, content, "utf8");
+  });
 }
 
 /** Binary write for composer uploads and other non-UTF8 payloads. */
@@ -92,10 +118,13 @@ export async function writeWorkspaceBytes(
   relPath: string,
   data: Buffer | Uint8Array
 ): Promise<void> {
-  await ensureWorkspaceDirs(userId);
-  const abs = resolveWorkspacePath(userId, relPath);
-  await mkdir(path.dirname(abs), { recursive: true });
-  await writeFile(abs, data);
+  allowWorkspaceWrite(userId, relPath);
+  await withWorkspaceLock(userId, async () => {
+    await ensureWorkspaceDirs(userId);
+    const abs = await checkedWorkspacePath(userId, relPath);
+    await mkdir(path.dirname(abs), { recursive: true });
+    await writeFile(abs, data);
+  });
 }
 
 export async function readWorkspaceBytes(
@@ -103,7 +132,7 @@ export async function readWorkspaceBytes(
   relPath: string
 ): Promise<Buffer> {
   await ensureWorkspaceDirs(userId);
-  const abs = resolveWorkspacePath(userId, relPath);
+  const abs = await checkedWorkspacePath(userId, relPath);
   return readFile(abs);
 }
 
@@ -122,7 +151,7 @@ export async function listWorkspaceFiles(
 ): Promise<WorkspaceFileEntry[]> {
   await ensureWorkspaceDirs(userId);
   const root = workspaceRootFor(userId);
-  const startAbs = resolveWorkspacePath(userId, subdir || ".");
+  const startAbs = await checkedWorkspacePath(userId, subdir || ".");
   const entries: WorkspaceFileEntry[] = [];
 
   async function walk(dirAbs: string): Promise<void> {

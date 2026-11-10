@@ -23,12 +23,15 @@ services:
       sizeGB: 1
     envVars:
       - key: NODE_VERSION
-        value: "22.16.0"
+        value: "22.19.0"
       - key: RAUCHAT_WORKSPACE
         value: /var/data/workspace
       # Required at runtime — chat, research, and titling all go through
       # OpenRouter.
       - key: OPENROUTER_API_KEY
+        sync: false
+      # Required for isolated shell and execution workflows.
+      - key: E2B_API_KEY
         sync: false
       # WorkOS AuthKit. The cookie password must be >= 32 chars
       # (openssl rand -hex 32).

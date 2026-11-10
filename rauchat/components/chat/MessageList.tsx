@@ -26,6 +26,7 @@ import {
 import type { Message } from "@/lib/types";
 import styles from "./chat.module.css";
 import { MessageItem, type MessageActions } from "./MessageItem";
+import { RecoveredWorkflows } from "./RecoveredWorkflows";
 import { IconArrowDown } from "./icons";
 
 const PIN_THRESHOLD = 48; // §4.8
@@ -40,6 +41,7 @@ export const DEFAULT_SUGGESTIONS = [
 ];
 
 export type MessageListProps = {
+  conversationId?: string;
   messages: Message[];
   /** The in-flight assistant turn, if any. */
   streamingMessage?: Message | null;
@@ -58,6 +60,7 @@ export type MessageListProps = {
 
 export const MessageList = memo(function MessageList({
   messages,
+  conversationId,
   streamingMessage = null,
   isStreaming = false,
   statusLabel,
@@ -231,7 +234,7 @@ export const MessageList = memo(function MessageList({
                 Rau<span className={styles.wordmarkTail}>chat</span>
               </div>
               <p className={styles.emptyCopy}>
-                Start a conversation. Tools are off by default.
+                Ask a question or give RauChat a task.
               </p>
               <div className={styles.suggestions}>
                 {suggestions.slice(0, 4).map((s) => (
@@ -289,6 +292,7 @@ export const MessageList = memo(function MessageList({
               ) : null}
             </>
           )}
+          <RecoveredWorkflows conversationId={conversationId} messages={messages} streamingMessage={streamingMessage} isStreaming={isStreaming} />
         </div>
         {/* Tail spacer: gives an anchored user turn room to reach the top. */}
         <div className={styles.tailSpacer} ref={spacerRef} aria-hidden="true" />

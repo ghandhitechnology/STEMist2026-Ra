@@ -291,6 +291,7 @@ export const ChatView = memo(function ChatView({
 
       <div className={styles.chatBody}>
         <MessageList
+          conversationId={conversation?.id}
           messages={messages}
           streamingMessage={streamingMessage}
           isStreaming={isStreaming}

@@ -8,10 +8,13 @@ empathetic↔unempathetic, calm↔anxious) and the panel plots the result. The
 evaluator is an optional overlay — with no `GEMMA_ENDPOINT_URL` configured,
 the panel just renders dormant and the rest of the app works normally.
 
-Besides chat, Rauchat gives Claude five tools it can call mid-conversation:
-web search, PDF generation, sandboxed file read/write, and "make a skill"
-(persist a reusable system-prompt snippet). A Workspace browser and a
-Skills library expose the same sandbox and skill set through the UI.
+Rauchat embeds the pi agent SDK for tool calling and persistent sessions. Dynamic
+workflows assign specialized agents to dependent steps, verify their results, and
+save useful procedures as versioned skills with scripts and references. E2B
+provides isolated shell execution for signed-in users.
+
+See [Agent runtime and dynamic workflows](AGENT_WORKFLOWS.md) for setup, available
+tools, budgets, storage, and recovery. Node 22.19 or later is required.
 
 ## Architecture
 

@@ -13,7 +13,12 @@
  */
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import type { Skill, ToolName } from "@/lib/types";
+import { TOOL_NAMES, type Skill, type ToolName } from "@/lib/types";
+import type {
+  SkillPackage,
+  SkillPackageView,
+  SkillRevision,
+} from "@/lib/skill-types";
 import { Modal } from "./Modal";
 import { IconPencil, IconTrash } from "./icons";
 import styles from "./SkillsModal.module.css";
@@ -27,19 +32,34 @@ export type SkillsModalProps = {
 };
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
+type PackageDetail = SkillPackageView & { revisions: SkillRevision[] };
 
-const CAPABILITY_TOOLS: Array<{ id: ToolName; label: string }> = [
-  { id: "web_search", label: "Web search" },
-  { id: "research", label: "Research mode" },
-  { id: "pdf_create", label: "Create PDFs" },
-  { id: "file_read", label: "Read files" },
-  { id: "file_write", label: "Write files" },
-  { id: "skill_make", label: "Draft skills" },
-  { id: "diagram", label: "Create artifacts" },
-  { id: "svg_render", label: "Inline sketch lean-in" },
-  { id: "memory_add", label: "Save memory" },
-  { id: "browser_use", label: "Browser use" },
-];
+const TOOL_LABELS: Record<ToolName, string> = {
+  web_search: "Web search",
+  research: "Research mode",
+  pdf_create: "Create PDFs",
+  file_read: "Read workspace files",
+  file_write: "Write workspace files",
+  skill_make: "Create skills",
+  diagram: "Create artifacts",
+  svg_render: "Inline sketches",
+  memory_add: "Save memory",
+  browser_use: "Browser",
+  bash: "Run shell commands",
+  read: "Read sandbox files",
+  write: "Write sandbox files",
+  edit: "Edit sandbox files",
+  ls: "List sandbox files",
+  find: "Find sandbox files",
+  grep: "Search sandbox files",
+  web_fetch: "Fetch web pages",
+  skills_list: "Find skills",
+  skill_view: "View skills",
+  skill_manage: "Manage skills",
+  workflow_run: "Run workflows",
+};
+
+const CAPABILITY_TOOLS = TOOL_NAMES.map((id) => ({ id, label: TOOL_LABELS[id] }));
 
 type SkillInput = {
   name: string;
@@ -118,7 +138,7 @@ export function SkillsModal({
   activeSkillIds,
   onToggleActive,
 }: SkillsModalProps) {
-  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skills, setSkills] = useState<SkillPackage[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [internalActive, setInternalActive] = useState<Set<string>>(new Set());
@@ -134,6 +154,10 @@ export function SkillsModal({
   const [formError, setFormError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [packageDetail, setPackageDetail] = useState<PackageDetail | null>(null);
+  const [packageLoading, setPackageLoading] = useState(false);
+  const [packageError, setPackageError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const activeSet =
@@ -149,7 +173,7 @@ export function SkillsModal({
         if (!res.ok) throw new Error(`Request failed (${res.status})`);
         return res.json();
       })
-      .then((data: { skills: Skill[] }) => {
+      .then((data: { skills: SkillPackage[] }) => {
         if (cancelled) return;
         setSkills(Array.isArray(data.skills) ? data.skills : []);
         setLoadState("loaded");
@@ -170,6 +194,8 @@ export function SkillsModal({
       setShowForm(false);
       setFormError(null);
       setImportStatus(null);
+      setPackageDetail(null);
+      setPackageError(null);
     }
   }, [open]);
 
@@ -191,9 +217,12 @@ export function SkillsModal({
     const previous = skills;
     setSkills((prev) => prev.filter((s) => s.id !== id));
     setConfirmDeleteId(null);
+    if (packageDetail?.skill.id === id) setPackageDetail(null);
     try {
       const res = await fetch(`/api/skills?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
       });
       if (!res.ok) throw new Error();
     } catch {
@@ -214,13 +243,14 @@ export function SkillsModal({
         body: JSON.stringify({ autoLoad: nextAutoLoad }),
       });
       if (!res.ok) throw new Error();
+      if (packageDetail?.skill.id === id) await loadPackage(id);
     } catch {
       setSkills(previous);
       setLoadError("Couldn't update auto-load. Try again.");
     }
   }
 
-  async function postSkill(input: SkillInput): Promise<Skill> {
+  async function postSkill(input: SkillInput): Promise<SkillPackage> {
     const res = await fetch("/api/skills", {
       method: "POST",
       headers: { "Content-Type": "application/json", accept: "application/json" },
@@ -234,7 +264,7 @@ export function SkillsModal({
         typeof body?.error === "string" ? body.error : `Request failed (${res.status})`
       );
     }
-    return (await res.json()) as Skill;
+    return (await res.json()) as SkillPackage;
   }
 
   function resetForm() {
@@ -302,10 +332,11 @@ export function SkillsModal({
               : `Request failed (${response.status})`
           );
         }
-        const updated = (await response.json()) as Skill;
+        const updated = (await response.json()) as SkillPackage;
         setSkills((previous) =>
           previous.map((skill) => (skill.id === updated.id ? updated : skill))
         );
+        if (packageDetail?.skill.id === updated.id) setPackageDetail(null);
       } else {
         const created = await postSkill({
           ...payload,
@@ -402,7 +433,7 @@ export function SkillsModal({
       if (unknownReference) {
         throw new Error(`Unknown skill capability: ${unknownReference}`);
       }
-      const installed: Skill[] = [];
+      const installed: SkillPackage[] = [];
       while (queue.length) {
         const pendingNames = new Set(queue.map((skill) => skill.name.toLowerCase()));
         const index = queue.findIndex((skill) =>
@@ -443,6 +474,76 @@ export function SkillsModal({
       );
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function loadPackage(
+    id: string,
+    revision?: number,
+    filePath = "SKILL.md"
+  ) {
+    setPackageLoading(true);
+    setPackageError(null);
+    try {
+      const query = new URLSearchParams({ path: filePath });
+      if (revision) query.set("revision", String(revision));
+      const response = await fetch(
+        `/api/skills/${encodeURIComponent(id)}?${query.toString()}`
+      );
+      const body = (await response.json().catch(() => null)) as
+        | (PackageDetail & { error?: string })
+        | null;
+      if (!response.ok || !body) {
+        throw new Error(body?.error ?? `Request failed (${response.status})`);
+      }
+      setPackageDetail(body);
+    } catch (error) {
+      setPackageError(
+        error instanceof Error ? error.message : "Failed to load skill package."
+      );
+    } finally {
+      setPackageLoading(false);
+    }
+  }
+
+  function togglePackage(skill: SkillPackage) {
+    if (packageDetail?.skill.id === skill.id) {
+      setPackageDetail(null);
+      setPackageError(null);
+      return;
+    }
+    void loadPackage(skill.id);
+  }
+
+  async function restoreRevision(revision: number) {
+    if (!packageDetail) return;
+    setRestoring(true);
+    setPackageError(null);
+    try {
+      const response = await fetch(
+        `/api/skills/${encodeURIComponent(packageDetail.skill.id)}/revisions/${revision}/restore`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        }
+      );
+      const body = (await response.json().catch(() => null)) as
+        | (SkillPackage & { error?: string })
+        | null;
+      if (!response.ok || !body) {
+        throw new Error(body?.error ?? `Request failed (${response.status})`);
+      }
+      setSkills((previous) =>
+        previous.map((skill) => (skill.id === body.id ? body : skill))
+      );
+      await loadPackage(body.id);
+    } catch (error) {
+      setPackageError(
+        error instanceof Error ? error.message : "Failed to restore revision."
+      );
+    } finally {
+      setRestoring(false);
     }
   }
 
@@ -565,6 +666,14 @@ export function SkillsModal({
                   <>
                     <button
                       type="button"
+                      className={styles.packageButton}
+                      aria-expanded={packageDetail?.skill.id === skill.id}
+                      onClick={() => togglePackage(skill)}
+                    >
+                      Package
+                    </button>
+                    <button
+                      type="button"
                       className={styles.editIcon}
                       aria-label={`Edit ${skill.name}`}
                       onClick={() => openEditSkillForm(skill)}
@@ -612,6 +721,93 @@ export function SkillsModal({
             </div>
           ))}
         </div>
+      )}
+
+      {(packageLoading || packageError || packageDetail) && (
+        <section className={styles.packagePanel} aria-label="Skill package">
+          {packageLoading && !packageDetail ? (
+            <p className={styles.stateText}>Loading package…</p>
+          ) : null}
+          {packageError ? <p className={styles.errorText}>{packageError}</p> : null}
+          {packageDetail ? (
+            <>
+              <div className={styles.packageHeading}>
+                <div>
+                  <div className={styles.formHeading}>{packageDetail.skill.name}</div>
+                  <span className={styles.fieldHint}>
+                    Revision {packageDetail.revision.revision} of {packageDetail.skill.revision}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonGhost} ${styles.buttonSmall}`}
+                  onClick={() => setPackageDetail(null)}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className={styles.packageColumns}>
+                <div className={styles.packageSidebar}>
+                  <span className={styles.packageLabel}>Files</span>
+                  {packageDetail.revision.files.map((file) => (
+                    <button
+                      type="button"
+                      key={file}
+                      className={styles.fileButton}
+                      data-active={packageDetail.path === file}
+                      onClick={() =>
+                        void loadPackage(
+                          packageDetail.skill.id,
+                          packageDetail.revision.revision,
+                          file
+                        )
+                      }
+                    >
+                      {file}
+                    </button>
+                  ))}
+                  <span className={styles.packageLabel}>History</span>
+                  {packageDetail.revisions.map((revision) => (
+                    <div className={styles.revisionRow} key={revision.revision}>
+                      <button
+                        type="button"
+                        className={styles.revisionButton}
+                        data-active={
+                          packageDetail.revision.revision === revision.revision
+                        }
+                        onClick={() =>
+                          void loadPackage(packageDetail.skill.id, revision.revision)
+                        }
+                      >
+                        <span>Revision {revision.revision}</span>
+                        <span>{new Date(revision.createdAt).toLocaleString()}</span>
+                      </button>
+                      {revision.revision !== packageDetail.skill.revision ? (
+                        <button
+                          type="button"
+                          className={styles.restoreButton}
+                          disabled={restoring}
+                          onClick={() => void restoreRevision(revision.revision)}
+                        >
+                          Restore
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                <div className={styles.packageFile}>
+                  <div className={styles.packageFileName}>
+                    {packageDetail.path ?? "Select a file"}
+                  </div>
+                  <pre className={styles.packageContent}>
+                    {packageDetail.content ?? ""}
+                  </pre>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </section>
       )}
 
       {showForm && (

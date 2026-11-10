@@ -279,7 +279,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
             tools: input.tools ?? [],
             skillId: input.skillId ?? null,
             forceTools: input.forceTools ?? false,
-            autoTools: input.autoTools ?? false,
+            autoTools: input.autoTools ?? true,
             ...(input.model !== undefined ? { model: input.model } : {}),
             ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
             ...(input.attachments && input.attachments.length

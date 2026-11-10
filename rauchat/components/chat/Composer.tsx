@@ -52,6 +52,9 @@ const TOOL_CHIPS: Array<{
   label: string;
   Icon: (p: IconProps) => React.JSX.Element;
 }> = [
+  { tool: "workflow_run", label: "Workflow", Icon: IconResearch },
+  { tool: "bash", label: "Shell", Icon: IconFileWrite },
+  { tool: "web_fetch", label: "Read page", Icon: IconWebSearch },
   { tool: "web_search", label: "Web search", Icon: IconWebSearch },
   { tool: "research", label: "Research", Icon: IconResearch },
   { tool: "pdf_create", label: "PDF", Icon: IconPdf },

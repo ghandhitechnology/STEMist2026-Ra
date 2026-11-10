@@ -9,7 +9,8 @@ import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
-import type { SkillDraft, ToolName } from "@/lib/types";
+import { TOOL_NAMES, type SkillDraft, type ToolName } from "@/lib/types";
+import { createSkill, listSkills } from "./skills";
 import { prepareSvgForChat } from "@/lib/svg";
 import { browserUse } from "./browserbase";
 import { writeDiagram } from "./diagrams";
@@ -385,7 +386,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
   {
     name: "skill_make",
     description:
-      "Draft a reusable skill for the user to review. This does not install or persist the skill; the user confirms installation from the draft card.",
+      "Save a proven reusable skill to the user's library. Search existing skills first. Use skill_manage for updates, scripts, and revision restoration.",
     input_schema: {
       type: "object",
       properties: {
@@ -402,18 +403,7 @@ export const ANTHROPIC_TOOLS: Anthropic.Tool[] = [
           type: "array",
           items: {
             type: "string",
-            enum: [
-              "web_search",
-              "research",
-              "pdf_create",
-              "file_read",
-              "file_write",
-              "skill_make",
-              "diagram",
-              "svg_render",
-              "memory_add",
-              "browser_use",
-            ],
+            enum: [...TOOL_NAMES],
           },
           description: "Tool capabilities this skill needs when active.",
         },
@@ -565,7 +555,7 @@ export function toolEventTitle(
     case "browser_use":
       return `"${truncate(String(input.task ?? ""), 72)}"`;
     default:
-      return "";
+      return truncate(String(input.goal ?? input.command ?? input.path ?? input.url ?? input.query ?? input.id ?? input.action ?? ""), 96);
   }
 }
 
@@ -618,18 +608,7 @@ export async function executeTool(
       const name = String(input.name ?? "");
       const description = String(input.description ?? "");
       const instructions = String(input.instructions ?? "");
-      const validToolNames = new Set<ToolName>([
-        "web_search",
-        "research",
-        "pdf_create",
-        "file_read",
-        "file_write",
-        "skill_make",
-        "diagram",
-        "svg_render",
-        "memory_add",
-        "browser_use",
-      ]);
+      const validToolNames = new Set<ToolName>(TOOL_NAMES);
       const capabilityTools = Array.isArray(input.tools)
         ? input.tools.filter(
             (tool): tool is ToolName =>
@@ -646,7 +625,10 @@ export async function executeTool(
         tools: capabilityTools,
         skills: capabilitySkills,
       });
-      return { result: draft, detail: "Draft ready for review" };
+      const existing = (await listSkills(userId)).find(skill => skill.name.toLowerCase() === name.trim().toLowerCase());
+      if (existing) return { result: { ...existing, installed: true }, detail: "Skill already exists; use skill_manage to improve it" };
+      const skill = await createSkill(userId, { ...draft, source: "generated", sourceDraftId: draft.draftId });
+      return { result: { ...skill, installed: true }, detail: "Skill saved" };
     }
     case "diagram": {
       const diagram = await diagramWrite(userId, {

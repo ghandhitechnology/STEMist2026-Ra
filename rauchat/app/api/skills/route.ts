@@ -13,7 +13,8 @@ import {
   listSkills,
   updateSkill,
 } from "@/lib/server/skills";
-import type { Skill, ToolName } from "@/lib/types";
+import { TOOL_NAMES, type ToolName } from "@/lib/types";
+import type { SkillUpdateInput } from "@/lib/skill-types";
 import { getUserId, unauthorized } from "@/lib/server/auth";
 import { crossSiteRejection } from "@/lib/server/http";
 
@@ -26,18 +27,7 @@ export async function GET() {
   return NextResponse.json({ skills });
 }
 
-const ToolNameSchema = z.enum([
-  "web_search",
-  "research",
-  "pdf_create",
-  "file_read",
-  "file_write",
-  "skill_make",
-  "diagram",
-  "svg_render",
-  "memory_add",
-  "browser_use",
-]);
+const ToolNameSchema = z.enum(TOOL_NAMES);
 
 const CapabilitiesSchema = z
   .object({
@@ -63,6 +53,7 @@ const CreateSkillSchema = z.object({
   source: z.enum(["manual", "generated", "imported"]).optional().default("manual"),
   draftId: z.string().uuid().optional(),
   capabilities: CapabilitiesSchema,
+  files: z.record(z.string(), z.string().max(1_000_000)).optional(),
 });
 
 async function resolveCapabilitySkills(
@@ -130,18 +121,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const skill = await createSkill(userId, {
-    name: parsed.data.name,
-    description: parsed.data.description,
-    instructions: parsed.data.instructions,
-    source: parsed.data.source,
-    sourceDraftId: parsed.data.draftId,
-    capabilities: {
-      tools: parsed.data.capabilities.tools as ToolName[],
-      skills: dependencies.ids,
-    },
-  });
-  return NextResponse.json(skill, { status: 201 });
+  try {
+    const skill = await createSkill(userId, {
+      name: parsed.data.name,
+      description: parsed.data.description,
+      instructions: parsed.data.instructions,
+      source: parsed.data.source,
+      sourceDraftId: parsed.data.draftId,
+      capabilities: {
+        tools: parsed.data.capabilities.tools as ToolName[],
+        skills: dependencies.ids,
+      },
+      files: parsed.data.files,
+    });
+    return NextResponse.json(skill, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create skill." },
+      { status: 400 }
+    );
+  }
 }
 
 const UpdateSkillSchema = z
@@ -151,6 +150,9 @@ const UpdateSkillSchema = z
     instructions: z.string().trim().min(1).max(20000).optional(),
     autoLoad: z.boolean().optional(),
     capabilities: CapabilitiesSchema.optional(),
+    files: z
+      .record(z.string(), z.string().max(1_000_000).nullable())
+      .optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "Empty patch." });
 
@@ -177,9 +179,7 @@ export async function PATCH(req: NextRequest) {
       { status: 400 }
     );
   }
-  let patch: Partial<
-    Pick<Skill, "name" | "description" | "instructions" | "autoLoad" | "capabilities">
-  > = parsed.data;
+  let patch: SkillUpdateInput = parsed.data;
   if (parsed.data.capabilities) {
     const dependencies = await resolveCapabilitySkills(
       userId,
@@ -205,7 +205,15 @@ export async function PATCH(req: NextRequest) {
       },
     };
   }
-  const updated = await updateSkill(userId, id, patch);
+  let updated: Awaited<ReturnType<typeof updateSkill>>;
+  try {
+    updated = await updateSkill(userId, id, patch);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update skill." },
+      { status: 400 }
+    );
+  }
   if (!updated) {
     return NextResponse.json({ error: "Skill not found." }, { status: 404 });
   }
@@ -213,13 +221,23 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const crossSite = crossSiteRejection(req);
+  if (crossSite) return crossSite;
   const userId = await getUserId();
   if (!userId) return unauthorized();
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
     return NextResponse.json({ error: "Missing id query parameter." }, { status: 400 });
   }
-  const deleted = await deleteSkill(userId, id);
+  let deleted: boolean;
+  try {
+    deleted = await deleteSkill(userId, id);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to delete skill." },
+      { status: 400 }
+    );
+  }
   if (!deleted) {
     return NextResponse.json({ error: "Skill not found." }, { status: 404 });
   }

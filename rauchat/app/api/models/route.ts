@@ -49,6 +49,8 @@ export async function GET() {
     configured: Boolean(process.env.OPENROUTER_API_KEY),
     tools: {
       browser_use: browserUseConfigured(),
+      bash: Boolean(process.env.E2B_API_KEY),
+      workflow_run: true,
     },
   });
 }

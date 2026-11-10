@@ -30,6 +30,8 @@ import {
   IconWebSearch,
   type IconProps,
 } from "./icons";
+import { WorkflowCard } from "./WorkflowCard";
+import type { WorkflowRun } from "@/lib/workflow-types";
 import { prepareSvgForChat } from "@/lib/svg";
 // Imported by path, not through the components/diagrams barrel, so this does
 // not pull DiagramPanel (which imports this module's barrel) into a cycle.
@@ -138,6 +140,19 @@ type ToolMeta = {
 };
 
 const TOOL_META: Record<ToolName, ToolMeta> = {
+  bash: { label: "Shell", Icon: IconFileWrite },
+  read: { label: "Read file", Icon: IconFileRead },
+  write: { label: "Write file", Icon: IconFileWrite },
+  edit: { label: "Edit file", Icon: IconFileWrite },
+  ls: { label: "List files", Icon: IconFileRead },
+  find: { label: "Find files", Icon: IconFileRead },
+  grep: { label: "Search files", Icon: IconFileRead },
+  web_fetch: { label: "Read page", Icon: IconWebSearch },
+  skills_list: { label: "Find skills", Icon: IconSkill },
+  skill_view: { label: "Read skill", Icon: IconSkill },
+  skill_manage: { label: "Update skill", Icon: IconSkill },
+  workflow_run: { label: "Workflow", Icon: IconResearch },
+
   web_search: { label: "Web search", Icon: IconWebSearch, quoteArg: true },
   research: { label: "Research", Icon: IconResearch },
   pdf_create: { label: "Create PDF", Icon: IconPdf, keepExpanded: true },
@@ -154,6 +169,19 @@ const TOOL_META: Record<ToolName, ToolMeta> = {
 };
 
 const TOOL_VERBS: Record<ToolName, string> = {
+  bash: "Shell",
+  read: "Read file",
+  write: "Write file",
+  edit: "Edit file",
+  ls: "List files",
+  find: "Find files",
+  grep: "Search files",
+  web_fetch: "Read page",
+  skills_list: "Find skills",
+  skill_view: "Read skill",
+  skill_manage: "Update skill",
+  workflow_run: "Workflow",
+
   web_search: "Searching the web",
   research: "Researching",
   pdf_create: "Building the document",
@@ -653,7 +681,26 @@ function AnimatedSvg({ clean, title }: { clean: string; title?: string }) {
   );
 }
 
+function GenericToolBody({ event }: BodyProps) {
+  if (event.status === "running" && !event.result) return <Shimmer rows={2} />;
+  const value = typeof event.result === "string" ? event.result : JSON.stringify(event.result, null, 2);
+  return <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: 260, overflowY: "auto", fontSize: 12 }}>{value?.slice(0, 12000) ?? event.detail}</pre>;
+}
+
 const BODIES: Record<ToolName, (p: BodyProps) => React.JSX.Element> = {
+  bash: GenericToolBody,
+  read: GenericToolBody,
+  write: GenericToolBody,
+  edit: GenericToolBody,
+  ls: GenericToolBody,
+  find: GenericToolBody,
+  grep: GenericToolBody,
+  web_fetch: GenericToolBody,
+  skills_list: GenericToolBody,
+  skill_view: GenericToolBody,
+  skill_manage: GenericToolBody,
+  workflow_run: GenericToolBody,
+
   web_search: WebSearchBody,
   research: ResearchBody,
   pdf_create: PdfBody,
@@ -772,6 +819,13 @@ export const ToolEventCard = memo(function ToolEventCard({
         ? `“${arg}”`
         : arg;
   const Body = BODIES[event.tool];
+
+  if (event.tool === "workflow_run") {
+    const run = asRec(event.result);
+    if (typeof run?.id === "string" && Array.isArray(run.steps)) {
+      return <WorkflowCard initial={run as unknown as WorkflowRun} />;
+    }
+  }
 
   // A finished diagram is the deliverable itself, not a tool trace — it
   // replaces the collapsible card with its own openable card.

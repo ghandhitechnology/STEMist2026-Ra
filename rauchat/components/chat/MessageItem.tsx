@@ -44,10 +44,11 @@ const DELIVERABLE_TOOLS: ReadonlySet<ToolName> = new Set([
   "svg_render",
   "pdf_create",
   "skill_make",
+  "workflow_run",
 ]);
 
 const isDeliverable = (e: ToolEvent) =>
-  e.status === "done" && DELIVERABLE_TOOLS.has(e.tool);
+  e.tool === "workflow_run" || (e.status === "done" && DELIVERABLE_TOOLS.has(e.tool));
 
 export type MessageActions = {
   onRegenerate?: (message: Message) => void;

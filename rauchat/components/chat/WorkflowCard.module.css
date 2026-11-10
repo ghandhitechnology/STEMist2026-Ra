@@ -1,0 +1,23 @@
+.card { border: 1px solid var(--rau-border-default); border-radius: 8px; padding: 16px; margin: 12px 0; color: var(--rau-text-primary); font-size: 13px; }
+.header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.header strong { font-weight: 500; overflow-wrap: anywhere; }
+.header > span, .meta, .footer { color: var(--rau-text-secondary); font-size: 12px; }
+.header > span { flex-shrink: 0; }
+.progress { display: block; width: 100%; height: 3px; margin: 14px 0; accent-color: var(--rau-text-secondary); }
+.step { border-bottom: 1px solid var(--rau-border-default); padding: 9px 0; }
+.step summary { display: flex; gap: 12px; cursor: pointer; }
+.step summary span:first-child { text-transform: capitalize; min-width: 72px; }
+.step summary span:nth-child(2) { flex: 1; overflow-wrap: anywhere; }
+.step summary span:last-child { color: var(--rau-text-secondary); }
+.step p { margin: 10px 0; }
+.step ul { padding-left: 20px; }
+.step pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; font-size: 11px; }
+.reconcile { display: flex; gap: 8px; align-items: baseline; padding: 8px 0; }
+.result { padding-top: 14px; }
+.result > summary { cursor: pointer; }
+.footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; gap: 12px; }
+.controls { display: flex; gap: 8px; }
+.controls button { background: transparent; color: var(--rau-text-primary); border: 1px solid var(--rau-border-default); border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }
+.controls button:hover { background: var(--rau-fill-hover); }
+.controls button:disabled { opacity: .5; cursor: wait; }
+@media (max-width: 520px) { .header { flex-direction: column; gap: 4px; } .step summary { gap: 6px; } }

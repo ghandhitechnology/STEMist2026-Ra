@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
   // trace root keeps production output inside Rauchat instead of allowing
   // Next.js to infer an unrelated ancestor workspace.
   outputFileTracingRoot: projectRoot,
+  serverExternalPackages: ["@earendil-works/pi-coding-agent", "@earendil-works/pi-ai", "e2b"],
 };
 
 export default nextConfig;

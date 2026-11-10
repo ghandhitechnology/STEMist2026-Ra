@@ -180,16 +180,12 @@ export default function Home() {
     let cancelled = false;
     fetch("/api/models")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { tools?: { browser_use?: boolean } } | null) => {
+      .then((data: { tools?: { browser_use?: boolean; bash?: boolean } } | null) => {
         if (cancelled || !data) return;
-        setUnavailableTools(
-          data.tools?.browser_use
-            ? {}
-            : {
-                browser_use:
-                  "Set BROWSERBASE_API_KEY in your machine environment and restart Rauchat.",
-              }
-        );
+        setUnavailableTools({
+          ...(!data.tools?.browser_use ? { browser_use: "Browser service is not configured." } : {}),
+          ...(!data.tools?.bash ? { bash: "Workspace execution is not configured." } : {}),
+        });
       })
       .catch(() => {
         /* leave tools available; server will error clearly if misconfigured */
@@ -201,12 +197,12 @@ export default function Home() {
 
   // "/auto" mode: every tool is loaded each turn and the agent decides when
   // to use them. Persisted so it survives reloads.
-  const [autoTools, setAutoTools] = useState(false);
+  const [autoTools, setAutoTools] = useState(true);
   useEffect(() => {
     try {
-      setAutoTools(window.localStorage.getItem(AUTO_TOOLS_KEY) === "1");
+      setAutoTools(window.localStorage.getItem(AUTO_TOOLS_KEY) !== "0");
     } catch {
-      // localStorage unavailable — keep the default (off).
+      // localStorage unavailable — keep the default (on).
     }
   }, []);
   const toggleAutoTools = useCallback(() => {
@@ -473,6 +469,12 @@ export default function Home() {
   );
 
   const chat = useChatStream({
+    onToolEvent: event => {
+      if (event.status === "done" && ["skill_make", "skill_manage", "workflow_run"].includes(event.tool)) {
+        void fetch("/api/skills").then(res => res.ok ? res.json() : null)
+          .then(data => { if (Array.isArray(data?.skills)) setSkills(data.skills); }).catch(() => undefined);
+      }
+    },
     onDone: (final) => {
       const conversationId = pendingConversationIdRef.current;
       pendingConversationIdRef.current = null;
